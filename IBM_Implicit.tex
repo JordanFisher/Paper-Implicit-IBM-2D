@@ -37,7 +37,8 @@
 % \usepackage{lineno}
 \newcommand{\norm}[1]{\left\lVert#1\right\rVert}
 \newtheorem{claim}{Claim}[section]
-
+\newtheorem{theorem}{Theorem}[section]
+\newtheorem{lemma}{Lemma}[section]
 % \linenumbers
 
 \journal{Journal of Computational Physics}
@@ -89,16 +90,16 @@ Caixa Postal 66281, CEP 05311-970, S\~ao Paulo-SP, Brasil.}
 The Immersed Boundary Method is a versatile tool for the investigation of flow-structure interaction.
 In a large number of applications, the immersed boundaries or structures are very stiff and strong tangential
 forces on these interfaces induce a well-known, severe time-step restriction for explicit discretizations.  This excessive stability constraint can be removed with fully implicit or suitable semi-implicit schemes but at a seemingly prohibitive computational cost. 
-While more economical alternatives have been proposed for  special cases, 
+While economical alternatives have been proposed recently for  some special cases, 
 there is a practical need for a computationally efficient approach that can be applied more broadly.
-% and that does not hinder the enormous structure-building capability of the Immersed Boundary methodology.  
-Recently,  a robust  semi-implicit discretization introduced by Peskin in the late 70's has received renewed attention. This discretization, in which the spreading and interpolation operators are lagged,  leads to  a linear system of equations for the interface configuration at the future time when the interfacial force is linear.  However, this linear system is large and dense and thus it is challenging to streamline its solution. Moreover, while  the same linear system or one of similar structure could potentially be used in Newton-type iterations, nonlinear and highly stiff immersed structures pose additional challenges to iterative methods.
+In this context, we revisit a robust  semi-implicit discretization introduced by Peskin in the late 70's which has received renewed attention recently. This discretization, in which the spreading and interpolation operators are lagged,  leads to  a linear system of equations for the interface configuration at the future time,  when the interfacial force is linear.  However, this linear system is large and dense and thus it is challenging to streamline its solution. Moreover, while  the same linear system or one of similar structure could potentially be used in Newton-type iterations, nonlinear and highly stiff immersed structures pose additional challenges to iterative methods.
 In this work,  we address these problems and propose cost-effective computational strategies  for solving Peskin's lagged-operators
-type of discretization.  We do this by first constructing a sufficiently accurate approximation to the system's matrix which can
-be expeditiously obtained by using a combination of pre-computed values and interpolation.  The availability  of  a matrix allows for
-more efficient matrix-vector products and facilitates the design of effective iterative schemes.    
-We then propose effective iterative methods to deal with both linear and nonlinear interfacial forces and simple or complex immersed structures with tethered or untethered points.  One of these iterative approaches employs a splitting in which 
-we first solve a linear problem  for the interfacial force and then we use a nonlinear iteration to find the interface configuration corresponding to this force.  We demonstrate that our approach is several orders of magnitude more efficient than the standard explicit method. In addition to considering the standard elliptical drop test case, we show both the robustness and efficacy of our proposed methodology with a challenging application of a 2D model of a heart valve.
+type of discretization.  We do this by first constructing a sufficiently accurate approximation to the system's matrix 
+and we obtain a rigorous estimate for this approximation. This matrix is expeditiously computed by using a combination of pre-calculated
+values and interpolation.   The availability  of  a matrix allows for
+more efficient matrix-vector products and facilitates the design of effective iterative schemes.    We propose efficient iterative
+approaches to deal with both linear and nonlinear interfacial forces and simple or complex immersed structures with tethered or untethered points.  One of these iterative approaches employs a splitting in which 
+we first solve a linear problem  for the interfacial force and then we use a nonlinear iteration to find the interface configuration corresponding to this force.  We demonstrate that the proposed approach is several orders of magnitude more efficient than the standard explicit method. In addition to considering the standard elliptical drop test case, we show both the robustness and efficacy of the proposed methodology with a  2D model of a heart valve.
 \end{abstract}
 
 \begin{keyword}
@@ -115,54 +116,60 @@ semi-implicit method \sep Stokes flow \sep Navier-Stokes equations \sep heart va
 
 % main text
 \section{Introduction}
-The Immersed Boundary (IB) Method introduced by Peskin~\cite{Peskin77} is a versatile tool for simulating flow-structure interaction for a wide range of applications.  The IB Method employs a Lagrangian representation of 
+The Immersed Boundary (IB) Method introduced by Peskin~\cite{Peskin77} is a versatile tool for simulating flow-structure interaction in a wide range of applications.  The IB Method employs a Lagrangian representation of 
 the immersed structures and their interfacial forces and an Eulerian description of the 
-flow variables (velocity and pressure).  The Lagrangian description of the immersed boundaries provides a vast structure-building capability while the Eulerian flow description permits the use of efficient flow solvers.
-The power of the IB method lies in a seamless connection of the two descriptions by the use of two operations: 
+flow variables (velocity and pressure).  The Lagrangian description of the immersed boundaries, which does not have to conform to the Eulerian grid,  provides a vast structure-building capability while the Eulerian flow description permits the use of efficient flow solvers.
+The power of the IB Method lies in a seamless connection of the two descriptions by the use of two operations: 
 {\em spreading} (of interfacial forces) and {\em interpolation} (of velocity at the immersed boundary), both achieved via mollified delta functions. 
   
-In a large number of applications, the immersed boundaries or structures are very stiff and strong tangential
-forces on these interfaces induce severe time-step restrictions for explicit discretization~\cite{SW95,SW99}. Fully implicit discretizations and some suitable semi-implicit schemes remove this hindering constraint but seemingly at a cost that makes these options impractical~\cite{TP92, MP93}.  A very economical semi-implicit method has been proposed recently by Hou and Shi~\cite{HS2008a,HS2008b}. This novel approach relies on an ingenious  small scale decomposition and becomes explicit in Fourier space. While nearly computationally optimal, the method of Hou and Shi is applicable only to a simple interface, given as a closed curve. Thus, there is still a practical need for a robust, cost-effective approach that can be applied more broadly; one that can be used
-for immersed structures of complex geometry, composed of mix tethered and untethered links,  which are required in many of the applications of the IB Method.  The advancement of such an approach is the main focus of this work.
+In a large number of applications, the immersed boundaries or structures are very stiff and strong {\em tangential}
+forces on these interfaces induce severe time-step restrictions for explicit discretization~\cite{SW95,SW99}. Fully implicit discretizations and some suitable semi-implicit schemes remove this hindering constraint but seemingly at a cost that makes these options impractical~\cite{TP92, MP93}.  Recently, an economical semi-implicit method has been proposed by Hou and Shi~\cite{HS2008a,HS2008b}. This novel approach relies on an ingenious  small scale decomposition and becomes explicit in Fourier space. While nearly computationally optimal, the method of Hou and Shi is applicable only to simple periodic interfaces. 
+Thus, there is a practical need for a robust, cost-effective approach that can be applied more broadly; one that can be used
+for immersed structures of complex geometry with crossed links as well as a mix of tethered and untethered points,  which are required in many of the applications of the IB Method.  The advancement of such an approach is the main focus of this work.
 
-Our starting point is a semi-implicit scheme introduced Peskin~\cite{Peskin77} in the late 70's, in which
+Our starting point is a semi-implicit scheme introduced by Peskin~\cite{Peskin77} in the late 70's, in which
 the spreading and interpolation operators are lagged, i.e. evaluated at the current interfacial configuration rather than at the future one.  Variations of this scheme were also considered by Tu and Peskin~\cite{TP92} and by Mayo and Peskin~\cite{MP93}. This lagged-operators discretization has recently received renewed attention.  In particular, Newren, Fogelson, Guy, and Kirby
-proved that this scheme, in its first order or second order Crank-Nicolson form, is unconditionally stable when inertia is neglected and the interfacial  force is linear and self-adjoint~\cite{NFGK2007}. Numerical experiments in ~\cite{NFGK2007}, as well as our own experiments, suggest this stability extends to the inertial case with nonlinear interfacial force. Thus, it is now established that 
+proved that this scheme, in its first order or second order Crank-Nicolson form, is unconditionally stable when inertia is neglected and the interfacial  force is linear and self-adjoint~\cite{NFGK2007}. Numerical experiments in~\cite{NFGK2007}, as well as our own experiments, suggest the robustness of this discretization extends to the inertial case with nonlinear interfacial force.
+ Thus, it is now established that 
 Peskin's original semi-implicit discretization enjoys great stability properties and robustness, 
 hence the relevant question is whether its solution  can be computed at a reasonable cost. Recently, Mori and Peskin~\cite{MP2008}  took an important step to answer this question. 
-They considered a variation of this scheme, with a linearized tension force discretization which leads to a linear system of equations for the interface configuration at the future time step. They also considered a fully implicit method solved iteratively where each of the iterates has the same structure as the linearized semi-implicit discretization.  Mori and Peskin opted for Krylov subspace methods to solve the linear system to take advantage of the  fact that matrix-vector products can be obtained via standard operations in the IB method and to avoid the construction of the system's dense matrix. 
+They considered a variation of this scheme, with a linearized tension force discretization which leads to a linear system of equations for the interface configuration at the future time step. They also proposed a fully implicit method solved iteratively where each of the iterates has the same structure as the linearized semi-implicit discretization.  Mori and Peskin opted for Krylov subspace methods to solve the linear system to take advantage of the  fact that matrix-vector products can be obtained via standard operations in the IB Method and to avoid the construction of the system's dense matrix. 
 
 In this work  we demonstrate that the solution to Peskin's operator-lagged discretization
 can be obtained much more efficiently by working directly with the matrix, and by using suitable linear and nonlinear iterative methods. More precisely, we construct a sufficiently accurate approximation to the matrix which can
 be expeditiously obtained by using a combination of pre-computed values and interpolation.   The availability  of a matrix allows 
-for streamlined matrix-vector products and facilitates the design of effective iterative schemes.   Most of the work to date on the investigation and removal of the numerical stiffness of the IB Method has focused on a simple test problem: a relaxing elliptical drop.
+for streamlined matrix-vector products and facilitates the design of effective iterative schemes.  
+
+ Most of the work to date on the investigation and removal of the numerical stiffness of the IB Method has focused on a simple test problem: a relaxing elliptical drop.
 While this test model contains the characteristic high stiffness of the IB approach in a simple interfacial geometry it does not showcase the additional complications that might arise when the immersed structure is composed of crossed links with both tethered and untethered points. Such complex structures are common in applications, starting with the origins of the method to investigate blood
-flow in the heart~\cite{Peskin77}.  In this work, in addition to obtaining efficient methods for 
-the standard elliptical drop test case, we also propose cost-effective iterative methods to deal with cases of complex immersed structures with tethered and untethered points. In our proposed approach
+flow in the heart~\cite{Peskin77}.  Thus, in addition  to obtaining efficient methods for 
+the standard elliptical drop test case, we also propose cost-effective iterative methods to deal with cases of more complex immersed structures. In our proposed approach
 we employ  a splitting in which we first solve efficiently a linear problem for the interfacial force and then we use a fast-converging nonlinear iteration to find the interface configuration corresponding to this force.  We develop this method in the context of a 2D
-model of a heart valve and demonstrate that our approach is several orders of magnitude more efficient than the standard explicit method. 
+model of a heart valve and demonstrate that the proposed approach is several orders of magnitude more efficient than the standard explicit method. 
  
- The rest of the paper is organized as follows. In Section~\ref{Sec:IB}, we review the formulation of the IB method. Section~\ref{Sec:discretization} deals with the discretization with the focus on  Peskin's semi-implicit scheme with lagged-opperators. We devote Section~\ref{Sec:matrix} to the construction of the approximation to the matrix and we obtain an estimate for that approximation.
- In Section~\ref{Sec:drop}, we consider the case of the relaxing elliptical drop with both linear and nonlinear forces.  Section~\ref{Sec:valve} is devoted to the heart valve problem and the splitting scheme.
+ The rest of the paper is organized as follows. In Section~\ref{Sec:IB}, we review the formulation of the IB Method. Section~\ref{Sec:discretization} deals with the discretization with the focus on  Peskin's semi-implicit scheme with lagged-operators. We devote Section~\ref{Sec:matrix} to the construction of the matrix approximation and     to a rigorous estimate of that approximation.
+ In Section~\ref{Sec:drop}, we consider the case of the relaxing elliptical drop with linear force density while the case of 
+ a nonlinear force and the same interfacial configuration is considered in Section~\ref{Sec:Nonlinear}. 
+ Section~\ref{Sec:valve} is devoted to the simple 2D model of the heart valve and the splitting scheme and concluding remarks are presented in Section~\ref{Sec:Conclusions}.
 
 
  \section{The Immersed Boundary Method}
  \label{Sec:IB}
 To describe the method,  in its simplest form, we 
-consider a two-dimensional, incompressible, newtonian fluid occupying a domain $\Omega \subset \mathbb{R}^2$. Inside this domain
-we assume that there is an immersed, neutrally buoyant, elastic structure (also referred to as boundary or interface). This fluid-immersed interface is composed of a system  $\Gamma$ of elastic fibers whose position at any time $t$ is represented in Lagrangian form by $\mathbf{X}(s,t)$, where $s \in B$ is a Lagrangian parameter. The interface $\Gamma$
+consider a two-dimensional, incompressible, Newtonian fluid occupying a domain $\Omega \subset \mathbb{R}^2$. Inside this domain
+we assume that there is an immersed, neutrally buoyant, elastic structure (also referred to as boundary or interface). This immersed interface is composed of a system  $\Gamma$ of elastic fibers whose position at any time $t$ is represented in Lagrangian form by $\mathbf{X}(s,t)$, where $s \in B$ is a Lagrangian parameter. The interface $\Gamma$
 need not be closed or even continuous. The governing equations are:
 \begin{align}
 \rho \left(\frac{\partial \mathbf{u}}{\partial t} + \mathbf{u}\cdot\nabla\mathbf{u} \right) &= -\nabla p + \mu\nabla^2 \mathbf{u} + \mathbf{f}, \label{eq:momentum}\\ 
 \nabla \cdot \mathbf{u} &= 0, \label{eq:incompressibility}\\
 \frac{\partial \mathbf{X}}{\partial t}  &= \mathbf{u}(\mathbf{X},t), \label{eq:noslip}
 \end{align}
-where $\rho$ and $\mu$ are the density and viscosity, respectively (both assumed to be constant). Here $\mathbf{u}(\mathbf{x},t)$ and $p(\mathbf{x},t)$ are the velocity field and the pressure, respectively, described in terms of the Eulerian, cartesian coordinate $\mathbf{x}$. The term $\mathbf{f}$ represents the singularly supported interfacial (tension) force of the immersed structure acting onto the fluid. The system (\ref{eq:momentum})-(\ref{eq:noslip}) is supplemented with initial and boundary conditions. Throughout this work, we consider only periodic boundary conditions and $\Omega$ is a rectangular domain.
+where $\rho$ and $\mu$ are the density and viscosity, respectively (both assumed to be constant). Here $\mathbf{u}(\mathbf{x},t)$ and $p(\mathbf{x},t)$ are the velocity field and the pressure, respectively, described in terms of the Eulerian, Cartesian coordinate $\mathbf{x}$. The term $\mathbf{f}$ represents the singularly supported interfacial (tension) force of the immersed structure acting onto the fluid. The system (\ref{eq:momentum})-(\ref{eq:noslip}) is supplemented with initial and boundary conditions. Throughout this work, we consider only periodic boundary conditions and $\Omega$ is a rectangular domain.
 
 The crux of the IB method and much of its versatility is the seamless connection of the Lagrangian representation of the immersed structure with the Eulerian representation of the flow. This is achieved via the identities:
 \begin{align}
 \frac{\partial \mathbf{X}}{\partial t}  &= \int_{\Omega} \mathbf{u}(\mathbf{x},t)\delta(\mathbf{x}-\mathbf{X}(s,t)) d \mathbf{x}, \label{eq:cont_interp} \\
-\mathbf{f}(\mathbf{x},t) &= \int_{B} \mathbf{F}(\mathbf{X}(\cdot,\cdot)s,t)\delta(\mathbf{x}-\mathbf{X}(s,t)) ds
+\mathbf{f}(\mathbf{x},t) &= \int_{B} \mathbf{F}(\mathbf{X}(\cdot,\cdot),s,t)\delta(\mathbf{x}-\mathbf{X}(s,t)) ds
 \label{eq:cont_spread},
 \end{align}
 where $\delta$ denotes the (two-dimensional) Dirac delta distribution. In (\ref{eq:cont_spread}), $\mathbf{F}$
@@ -173,7 +180,7 @@ if the tangent direction $\mathbf{t}$ along the fibers varies smoothly and if th
 \end{equation}
 Here $T(|\frac{\partial\mathbf{X}}{\partial s}|)$ is the fiber (interfacial) tension and $\mathbf{t}$ is the unit tangent,
 \begin{equation}
-\mathbf{t} =\frac{\frac{\partial\mathbf{X}}{\partial s}}{|\frac{\partial\mathbf{X}}{\partial s}|}.
+\mathbf{t} =\frac{\frac{\partial\mathbf{X}}{\partial s}}{\left|\frac{\partial\mathbf{X}}{\partial s}\right|}.
 \end{equation}
 Thus $\mathbf{F}$ is in general a nonlinear function of the interfacial configuration. We denote this relation by
 \begin{equation}
@@ -186,14 +193,14 @@ Thus $\mathbf{F}$ is in general a nonlinear function of the interfacial configur
 
 \section{Discretization}
 \label{Sec:discretization}
-We consider uniform cartesian grids $\mathcal{G}_\Omega$  and $\mathcal{G}_B$ with grid size $h$ and $h_B$
-to discretize $\Omega$ and $B$ respectively and employ standard second order finite differences for the spatial derivatives.  We write Peskin's original semi-implicit discretization in the form
+We consider uniform Cartesian grids $\mathcal{G}_\Omega$  and $\mathcal{G}_B$ with grid size $h$ and $h_B$, respectively 
+to discretize $\Omega$ and $B$  and employ standard second order finite differences for the spatial derivatives.  We write Peskin's original semi-implicit discretization in the form
 \begin{align}
 \rho\left(\frac{\mathbf{u}^{n+1}-\mathbf{u}^n}{\Delta t} + \mathbf{u}^n\cdot\mathbf{D}_h\mathbf{u}^n\right) &= -\mathbf{D}_h p^{n+1}+ \mu L_h \mathbf{u}^{n+1} + \mathcal{S}_n\mathcal{A}_{h_B}(\mathbf{X}^{n+1}), \label{eq:dmoment} \\
 \mathbf{D}_h \cdot \mathbf{u}^{n+1} &= 0, \label{eq:ddivergence} \\
 \frac{\mathbf{X}^{n+1}-\mathbf{X}^n}{\Delta t} &= \mathcal{S}^*_n\mathbf{u}^{n+1}, \label{eq:Xt}
 \end{align}
-where a superscript  $m$ denotes a numerical approximation taken at the time $m \Delta t$ and $\Delta t$ is the time step. The spatial operators $\mathbf{D}_h$ and $L_h$ are the standard second order approximations to the gradient and the laplacian, respectively,  and $\mathcal{A}_{h_B}$ is a suitable discrete version of $\mathcal{A}$. 
+where a superscript  $m$ denotes a numerical approximation taken at the time $m \Delta t$ and $\Delta t$ is the time step. The spatial operators $\mathbf{D}_h$ and $L_h$ are the standard second order approximations to the gradient and the Laplacian, respectively,  and $\mathcal{A}_{h_B}$ is a suitable discrete version of $\mathcal{A}$. 
 
   $ \mathcal{S}_n$ and $ \mathcal{S}^*_n$ are the  {\em lagged} spreading and interpolation operators, respectively,  given by
 \begin{align}
@@ -202,14 +209,14 @@ where a superscript  $m$ denotes a numerical approximation taken at the time $m 
 (\mathcal{S}^*_n w)(s) &= \sum_{ \mathbf{x} \in \mathcal{G}_\Omega} w(\mathbf{x})\delta_h(\mathbf{x}-\mathbf{X}^n(s))h^2,
 \label{eq:S*}
 \end{align}
-where $\delta_h(\mathbf{x}) = d_h(x)d_h(y)$ and $d_h$ is an approximation of the one-dimensinal delta. 
+where $\delta_h(\mathbf{x}) = d_h(x)d_h(y)$ and $d_h$ is an approximation of the one-dimensional delta. 
 These operators are called lagged because the interface configuration $\mathbf{X}^n$ is used 
 instead of the future configuration $\mathbf{X}^{n+1}$.
 
 There is flexibility in the choice of $d_h$ but for concreteness in the presentation we choose Peskin's 
 delta~\cite{Peskin77}:
 \begin{equation}
-\delta_h(r) = \begin{cases}
+d_h(r) = \begin{cases}
 \frac{1}{4h}\left( 1+\cos(\frac{\pi r}{2h})\right)& \textrm{if } |r|\leq 2h \\
 0& \textrm{otherwise}.
 \end{cases}
@@ -217,7 +224,7 @@ delta~\cite{Peskin77}:
 
 Let us rewrite (\ref{eq:dmoment}) as
 \begin{equation}
-\mathbf{u}^{n+1}=-\frac{\Delta t}{\rho} \mathbf{D}_h p^{n+1} + \Delta t \nu L_h \mathbf{u}^{n+1} + \mathbf{a}^{n+1},
+\mathbf{u}^{n+1}=-\frac{\Delta t}{\rho} \mathbf{D}_h p^{n+1} + \nu\Delta t L_h \mathbf{u}^{n+1} + \mathbf{a}^{n+1},
 \label{eq:upa}
 \end{equation}
 where $\nu=\mu/\rho$ and
@@ -231,27 +238,27 @@ $P_h$ defined as
 \end{equation}
 for any smooth vector field $\mathbf{v}$ defined on the grid $\mathcal{G}_{\Omega}$. Applying $P_h$ to (\ref{eq:upa}), using  (\ref{eq:ddivergence}) and that for periodic boundary conditions $L_h$ and $P_h$ commute we get
 \begin{equation}
-\mathbf{u}^{n+1}= \Delta t \nu L_h \mathbf{u}^{n+1} + P_h \mathbf{a}^{n+1},
+\mathbf{u}^{n+1}= \nu\Delta t L_h \mathbf{u}^{n+1} + P_h \mathbf{a}^{n+1},
 \end{equation}
 that is
 \begin{equation}
-\mathbf{u}^{n+1} = (I -\Delta t \nu L_h)^{-1}  P_h \mathbf{a}^{n+1}.
+\mathbf{u}^{n+1} = (I -\nu\Delta t L_h)^{-1}  P_h \mathbf{a}^{n+1}.
 \end{equation}
 Let us denote
 \begin{equation}
-\mathcal{L}_h = (I -\Delta t \nu L_h)^{-1}  P_h. \label{eq:L_h}
+\mathcal{L}_h = (I -\nu\Delta t L_h)^{-1}  P_h. \label{eq:L_h}
 \end{equation}
 $\mathcal{L}_h$ is a linear operator which henceforth we will refer to as the fluid solver. Note that with periodic boundary conditions and a standard second order finite difference approximation for the spatial derivatives,
-  $I -\Delta t \nu L_h$ is symmetric and positive definite and as a result so is its inverse. 
+  $I -\nu\Delta t L_h$ is symmetric and positive definite and as a result so is its inverse. 
   On the other hand, $P_h$ is also symmetric and, being 
-  a projection, it is positive semi-definite. Moreover, $P_h$ and $(I -\Delta t \nu L_h)^{-1}$ commute 
+  a projection, it is positive semi-definite. Moreover, $P_h$ and $(I -\nu\Delta t L_h)^{-1}$ commute 
   as can be shown using the discrete Fourier transform. Consequently, these two symmetric operators can be diagonalized by the same orthogonal matrix and thus the product, $\mathcal{L}_h $, is positive semi-definite. 
 
 
 
 
 
-Using this notation Peskin's semi-implicit method  can be encoded as
+Using this notation,  Peskin's semi-implicit method  can be encoded as
 \begin{align}
 \mathbf{u}^{n+1} &= \mathcal{L}_h \mathbf{a}^{n+1}, \label{eq:uL} \\
 \mathbf{X}^{n+1}&=\mathbf{X}^n +\Delta t\mathcal{S}^*_n\mathbf{u}^{n+1}, \label{eq:Xu}
@@ -273,8 +280,8 @@ and
  \mathbf{b}^n = \mathbf{X}^n + \Delta t \mathcal{S}^*_n \mathcal{L}_h [\mathbf{u}^n-\Delta t \mathbf{u}^n \cdot
  \nabla_h \mathbf{u}^n]. \label{eq:bn}
 \end{equation}
-We have thus reduced (\ref{eq:dmoment})-(\ref{eq:Xt}) to a single system of  equations involving only the unknown $\mathbf{X}^{n+1}$. If the number of Lagrangian nodes is $N_b$ then (\ref{eq:Xnl}) represents a system of $2N_b$ equations for the 
-$2N_b$ values $\mathbf{X}^{n+1}=(X^{n+1},Y^{n+1})$. If we can solve this system then we can obtain $\mathbf{u}^{n+1}$ via (\ref{eq:uL}). 
+We have thus reduced (\ref{eq:dmoment})-(\ref{eq:Xt}) to a single system of  equations involving only the unknown $\mathbf{X}^{n+1}$. If the number of Lagrangian nodes is $N_B$ then (\ref{eq:Xnl}) represents a system of $2N_B$ equations for the 
+$2N_B$ values $\mathbf{X}^{n+1}=(X^{n+1},Y^{n+1})$. If we can solve this system then we can obtain $\mathbf{u}^{n+1}$ via (\ref{eq:uL}). 
 
 
 Note that  the positive semi-definiteness of $\mathcal{L}_h$ extends to $\mathcal{M}_n$. Indeed, if we define the inner product on $\Omega$ as
@@ -296,13 +303,13 @@ In fact, $( \mathbf{F}, \mathcal{M}_n\mathbf{F} )_{B}>0$ for $\mathbf{F} \neq 0$
 known, the IB method spreading of the force fails in general to produce a discrete gradient which results in the generation of non-zero velocities referred to as spurious currents~\cite{Tryg01}.  Ironically, this defect of the IB approach has the benefit of rendering  $ \mathcal{M}_n$ positive definite provided $\mathcal{S}_n$ remains injective. This is something that we will exploit via {\em multigrid}.
 
 
-The focus of this paper is to propose efficient methods for solving (\ref{eq:Xnl}) to be able to remove the severe numerical stiffness of the IB method in an economical and robust fashion for a wide range of practical flow-structure situations.  Of course, to be efficient the specific computational approach  has to be dependent on the geometry of the immersed structure and the force operator $\mathcal{A}_{h_B}$.  This is something that has been largely 
+The focus of this paper is to propose efficient methods for solving (\ref{eq:Xnl}) to be able to remove the severe numerical stiffness of the IB Method in an economical and robust fashion for a wide range of practical flow-structure situations.  Of course, to be efficient the specific computational approach  has to be dependent on the geometry of the immersed structure and the force operator $\mathcal{A}_{h_B}$.  This is something that has been largely 
 overlooked in the literature as the research has concentrated mostly on understanding  and removing the stiffness 
-on the simplest setting: a simple closed (elliptical) interface with a linear density force $\mathcal{A}_{h_B}$.
+on a simple setting: an elliptical interface with a linear density force $\mathcal{A}_{h_B}$.
 Here, we consider both linear and nonlinear $\mathcal{A}_{h_B}$ with simple and complex immersed structure geometries to highlight the challenges in producing efficient solvers and to illustrate our proposed approaches.
 
 
-\section{Preliminary discussion of computational costs and efficiency} 
+\section{Some comments on computational costs and efficiency} 
 \label{Sec:Costs}
 One of the most commonly used schemes with an explicit treatment of the immersed boundary is the 
 so-called Forward Euler/Backward Euler (FE/BE)~\cite{SW99} in which the tension force is explicit (Forward Euler) and the 
@@ -311,12 +318,12 @@ viscous term is implicit (Backward Euler). That is,
 \mathbf{u}^{n+1} &= \mathcal{L}_h \left[\frac{\Delta t}{\rho}\, \mathcal{S}_n\mathcal{A}_{h_B}(\mathbf{X}^{n})+\mathbf{u}^n-\Delta t \, \, \mathbf{u}^n \cdot \nabla_h \mathbf{u}^n\right], \label{eq:FE} \\
 \mathbf{X}^{n+1}&=\mathbf{X}^n +\Delta t\mathcal{S}^*_n\mathbf{u}^{n+1}. \label{eq:BE}
 \end{align}
-The main cost of this scheme per time step is the fluid solver, i.e the operation involving $\mathcal{L}_h$.  On the other hand
+The main cost of this scheme per time step is the fluid solver, i.e. the operation involving $\mathcal{L}_h$.  On the other hand
 any solution method for (\ref{eq:Xnl}) requires the evaluation of $\mathbf{b}^n$, given by (\ref{eq:bn}), and thus  at
 least one fluid solver operation. Hence, it seems appropriate to measure the cost of iterative methods for (\ref{eq:Xnl}) relative to that 
 of one FE/BE time-step and we will refer to this unit as one FE/BE. 
 Our goal is to present robust solution methods to (\ref{eq:Xnl}) that have cost of just a few FE/BE's. Naturally, 
-because the semi-implicit scheme allows for time steps several orders of magnitude larger than those permitted by FE/BE in a stiff problem,  the extra computational work per time step will be more than compensated and a speed-up of several magnitudes could be achieved. 
+because the semi-implicit scheme allows for time steps several orders of magnitude larger than those permitted by the FE/BE scheme in a stiff problem,  the extra computational work per time step will be more than compensated and a speed-up of several orders of magnitude could be achieved. 
 
 In the design of efficient iterative methods for (\ref{eq:Xnl}) it is crucial to streamline the calculation of quantities of the form
 $\mathcal{M}_n\mathbf{F}$. These quantities can be computed in two ways.  Given an interface-defined vector $\mathbf{F}$
@@ -329,15 +336,15 @@ One of the advantages of having a matrix representation of the operator $\mathca
 Also, multigrid-based methods are greatly simplified when we have a matrix representation of $\mathcal{M}_n$, which allows us to employ a straightforward algebraic multigrid as opposed to a geometric one. One of the more subtle issues with using a geometric multigrid is how to coarsen the Eulerian grid. Uniform coarsening would be ineffective for example in the case of our heart valve model 
  because as we coarsen the valve geometry there remain points close together which would require a fine Eulerian mesh to resolve, see Fig.~\ref{fig:Valve1}. If a geometric multigrid were to be employed we would need to implement adaptive coarsening.
  
- A second advantage of having a matrix representation of $\mathcal{M}_n$ is that we can obtain direct solutions of {\em coarse} (small) linear systems of the form $\mathcal{M}_n\mathbf{F}=\mathbf{Z}$ which could be useful in a number of situations; an instance of this will be discussed later in the context of the heart valve problem. But perhaps the main advantage is that of cost when 
- computing quantities of the form  $\mathcal{M}_n\mathbf{F}$.  If this matrix-vector product is computed via the operator sequence  spreading-fluid solver-interpolation the cost is about one FE/BE or $O(N^2\log N) + O(N_b)$, when $N^2$ is the number of Eulerian nodes and the fluid solver is based on the Fast Fourier Transform (FFT).  
- On the other hand, a matrix-vector multiplication involving $\mathcal{M}_n$ requires $O(N_b^2)$ operations.  If  $N_b \sim N$ as it is typical in 2D applications, then the second approach has lower computational complexity. While
- the elimination of the factor $\log N$ might seem like a modest gain, we find that in practice (for $N_b=2N$) using the 
- matrix representation to compute matrix-vector products is significantly faster  than the spreading-fluid solver-interpolation approach, even at modest resolutions.  Table~\ref{Table:MV} gives the CPU time in units of FE/BE (average CPU time of one FE/BE time-step for a given $N\times N$ Eulerian grid and $N_b=2N$) for matrix-vector multiplications computed using a matrix representation of  $\mathcal{M}_n$.  For example, at $N_b=1024$,  the computation of a matrix-vector product with this approach is $1/71$ FE/BE, i.e.
+ A second advantage of having a matrix representation of $\mathcal{M}_n$ is that we can obtain direct solutions of {\em coarse} (small) linear systems of the form $\mathcal{M}_n\mathbf{F}=\mathbf{Z}$ which could be useful in a number of situations; an instance of this will be discussed later in the context of the 2D heart valve model. But perhaps the main advantage is that of cost when 
+ computing quantities of the form  $\mathcal{M}_n\mathbf{F}$.  If this matrix-vector product is computed via the operator sequence  spreading-fluid solver-interpolation the cost is about one FE/BE or $O(N^2\log N) + O(N_B)$, when $N^2$ is the number of Eulerian nodes and the fluid solver is based on the Fast Fourier Transform (FFT).  
+ On the other hand, a matrix-vector multiplication involving $\mathcal{M}_n$ requires $O(N_B^2)$ operations.  If  $N_B \sim N$ as it is typical in 2D applications, then the second approach has lower computational complexity. While
+ the elimination of the factor $\log N$ might seem like a modest gain, we find that in practice (for $N_B=2N$) using the 
+ matrix representation to compute matrix-vector products is significantly faster  than the spreading-fluid solver-interpolation approach, even at modest resolutions.  Table~\ref{Table:MV} gives the CPU time in units of FE/BE (average CPU time of one FE/BE time-step for a given $N\times N$ Eulerian grid and $N_B=2N$) for matrix-vector multiplications computed using a matrix representation of  $\mathcal{M}_n$.  For example, at $N_B=1024$,  the computation of a matrix-vector product with this approach is $1/71$ FE/BE, i.e.
   71 times faster than it would be using the spreading-fluid solver-interpolation option.
-  If in addition,  we take into the account that many matrix-vector products are needed in the course of an iterative method then the computational savings are significant. We note however that as the ratio $N_b/N$ increases the savings get reduced and the computational advantage of using the matrix to obtain the product could be lost eventually. For example, in our application of the heart valve model where $N_b  \sim 4N$, the speedup in using the matrix form drops to roughly $10$ at moderate to fine resolutions. While not as dramatic as that in the $N_b=2N$ case, it still leads to substantial savings in the overall algorithm.  However, 
-  in a fully 3D application with a 2D immersed membrane we would have $N_b \sim N^2$ leading to a cost of  $O(N^4)$ for 
-   a matrix-vector multiplication using the matrix  while obtaining the same product via spreading-fluid solver-interpolation would be $O(N^3\log N)$. 
+  If in addition,  we take into the account that many matrix-vector products are needed in the course of an iterative method then the computational savings are significant. We note however that as the ratio $N_B/N$ increases the savings get reduced and the computational advantage of using the matrix to obtain the product could be lost eventually. For example, in our application of the 2D heart valve model where $N_B  \sim 4N$, the speedup in using the matrix form drops to roughly $10$ at moderate to fine resolutions. While not as dramatic as that in the $N_B=2N$ case, it still leads to substantial savings in the overall algorithm.  However, 
+  in a fully 3D application with a 2D immersed membrane we would have $N_B \sim N^2$ leading to a cost of  $O(N^4)$ for 
+   a matrix-vector multiplication using the matrix  while obtaining the same product via spreading-fluid solver-interpolation would be $O(N^3\log N)$. Indeed, some 3D applications may use substantially more fiber points. The heart model proposed in	\cite{McQueenPeskin2000} employs nearly $N_B  \sim N^3$ fiber points. It's clear that alternative methods that don't rely on the full matrix of the fluid operator will be required to handle these applications.
   
 % \begin{table}
 %\caption{Average CPU time in seconds for a FE/BE timestep with given $N$ on a square $N\times N$ Eulerian grid}
@@ -356,8 +363,8 @@ Also, multigrid-based methods are greatly simplified when we have a matrix repre
 \begin{center}
 \begin{tabular}{|c|c c c|}
 \hline
-%$N_b$ & 128 & 256 & 384 & 512 & 640 & 768 & 896 & 1024\\
-$N_b=2N$ &  256  & 512 & 1024\\
+%$N_B$ & 128 & 256 & 384 & 512 & 640 & 768 & 896 & 1024\\
+$N_B=2N$ &  256  & 512 & 1024\\
 \hline
 \textrm{Matrix-Vector product} 
 & 1/26.8  & 1/58 &  1/71\\
@@ -367,13 +374,14 @@ $N_b=2N$ &  256  & 512 & 1024\\
 \hline
 \end{tabular}
 \end{center}
-\caption{Average CPU time in FE/BE units for a matrix-vector multiplication involving $\mathcal{M}_n$ for given $N_b=2N$}
+\caption{Average CPU time in FE/BE units for a matrix-vector multiplication involving $\mathcal{M}_n$ for given $N_B=2N$.}
 \label{Table:MV}
 \end{table}
 
 
 \section{An expedited computation of a matrix representation of $\mathcal{M}_n$}
 \label{Sec:matrix}
+\subsection{Approximation from translation invariance at the continuum level}
 Let us consider again the linear fluid solver operator (\ref{eq:L_h}) with periodic boundary conditions. Utilizing the Fourier transform we obtain a representation formula of the form
 \begin{equation}
  \mathcal{L}_h \mathbf{f}(\mathbf{x}) = \sum_{\mathbf{y} \in \mathcal{G}_\Omega} G_h (\mathbf{x}-\mathbf{y})\mathbf{f}(\mathbf{y})h^2, \qquad \text{for $\mathbf{x} \in \mathcal{G}_\Omega$},
@@ -388,15 +396,63 @@ $\mathbf{X}_j - \mathbf{X}_i$ but due to the spreading and interpolation operato
 Specifically, we propose to approximate $(\mathcal{M}_n)_{ij}$  with values obtained  by shifting both $\mathbf{X}_i$ and $\mathbf{X}_j$ an equal amount such that $\mathbf{X}_j$ lies exactly on an Eulerian node, which we may take as the origin. That is, we can fix the point (the origin) at which unit horizontal and vertical forces are applied (and spread) and then evaluate the effects everywhere else on the Eulerian grid by  applying just {\em two} fluid solves: one each for a horizontal and vertical force at the origin. These Eulerian grid values can be pre-computed at the
 beginning of the simulation and then be used as a look-up table to obtain the corresponding values at 
 any interfacial point $\mathbf{X}_i$  via standard interpolation. The generation of the one-time lookup table is only two $FE/BE$ and
-the interpolation to generate the approximation of  $\mathcal{M}_n$ is only $O(N_b^2)$.
+the interpolation to generate the approximation of  $\mathcal{M}_n$ is only $O(N_B^2)$.
 
-We proceed now to detail the computation of $\mathcal{M}_n$.  We write the configuration $\mathbf{X}$ of the discretized immersed structure as the $2Nb$-array 
+We proceed now to detail the computation of $\mathcal{M}_n$.  
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+Define for each interfacial node $j$, $1 \leq j \leq N_B$, the unit forces
+\begin{align}
+\mathbf{f}^j_k = 
+\begin{cases}
+(0,0)
+ & \text{If $k \neq j$}, \\
+\mathbf{e}_1 & \text{If $k=j$}
+\end{cases} \qquad 1 \leq k \leq N_B \label{eq:f}
+\end{align}
+and
+\begin{align}
+\mathbf{g}^j_k =
+\begin{cases}
+(0,0)
+ & \text{If $k \neq j$}, \\
+\mathbf{e}_2 & \text{If $k=j$}
+\end{cases} \qquad 1 \leq k \leq N_B, \label{eq:g}
+\end{align}
+where $\mathbf{e}_1=(1,0)$ and $\mathbf{e}_2=(0,1)$.
+Then
+\begin{align}
+(\mathcal{M}_n \mathbf{f}^j)_i &=
+\left( \alpha \,  \mathcal{S}^*_n \mathcal{L}_h 
+\sum_{\mathbf{X}_k \in \mathcal{G}_B}  \mathbf{f}^j_k \delta_h (\mathbf{x}-\mathbf{X}_k) h_B \right)_i  \\
+&= \alpha  h_B \left(  \mathcal{S}^*_n \mathcal{L}_h   \mathbf{e}_1 \delta_h (\mathbf{x}-\mathbf{X}_j)  \right)_i \\
+&=\alpha h_B  \, \sum_{\mathbf{z} \in \mathcal{G}_\Omega} \left(\mathcal{L}_h   \mathbf{e}_1 \delta_h (\mathbf{x}-\mathbf{X}_j) \right)
+(\mathbf{z}) \delta_h(\mathbf{z}-\mathbf{X}_i)h^2 \\
+& \approx  \alpha h_B  \, \sum_{\mathbf{z} \in \mathcal{G}_\Omega} \left( \mathcal{L}_h   \mathbf{e}_1 \delta_h (\mathbf{x}) \right) (\mathbf{z})
+\delta_h\left(\mathbf{z}-(\mathbf{X}_i-\mathbf{X}_j)\right)h^2,
+\end{align}
+and similarly
+\begin{align}
+(\mathcal{M}_n \mathbf{g}^j)_i  & \approx  \alpha h_B  \, \sum_{\mathbf{z} \in \mathcal{G}_\Omega} \left( \mathcal{L}_h   \mathbf{e}_2 \delta_h (\mathbf{x}) \right) (\mathbf{z})
+\delta_h\left(\mathbf{z}-(\mathbf{X}_i-\mathbf{X}_j)\right)h^2.
+\end{align}
+With these two approximations we define the vector-valued functions
+\begin{align}
+\mathbf{T}(\mathbf{y}) &=  \alpha h_B \, \sum_{\mathbf{z} \in \mathcal{G}_\Omega} \left(  \mathcal{L}_h \mathbf{e}_1 \delta_h (\mathbf{x}) \right) (\mathbf{z}) \delta_h\left(\mathbf{z}-\mathbf{y}\right)h^2, \\
+\mathbf{U}(\mathbf{y}) &=  \alpha h_B \, \sum_{\mathbf{z} \in \mathcal{G}_\Omega}  \left( \mathcal{L}_h \mathbf{e}_2 \delta_h (\mathbf{x}) \right) (\mathbf{z}) \delta_h\left(\mathbf{z}-\mathbf{y}\right)h^2,
+ \end{align}
+ and note that
+ \begin{align}
+(\mathcal{M}_n \mathbf{f}^j)_i & \approx \mathbf{T}(\mathbf{X}_i -\mathbf{X}_j), \label{eq:Mf}\\
+(\mathcal{M}_n \mathbf{g}^j)_i & \approx \mathbf{U}(\mathbf{X}_i -\mathbf{X}_j). \label{eq:Mg}
+\end{align}
+We can now compute the entries of a matrix representation of the linear operator $\mathcal{M}_n$ from $\mathbf{T}$ and 
+$\mathbf{U}$. To this end, we write the configuration $\mathbf{X}$ of the discretized immersed structure as the $2N_B$-array 
 \begin{equation}
 \mathbf{X}=\begin{bmatrix} X \\ Y \end{bmatrix} =
  \begin{bmatrix} X_1 \\ \vdots \\ X_{N_B} \\Y_1 \\ \vdots \\Y_{N_B}
 \end{bmatrix} ,
 \end{equation}
-and similarly we write  $\mathbf{F}=\mathcal{A}_{h_B}\mathbf{X}=(F,G)^T$. We seek then four $N_b\times N_b$ matrices $A$,$B$,$C$,$D$ such that
+and similarly we write  $\mathbf{F}=\mathcal{A}_{h_B}(\mathbf{X})=(F,G)^T$. We seek then four $N_B\times N_B$ matrices $A$, $B$, $C$, and $D$ such that
 \begin{equation}
 \mathcal{M}_n\mathbf{F} =
 \begin{bmatrix}
@@ -404,336 +460,286 @@ A & B \\
 C & D \end{bmatrix}
 \begin{bmatrix}
 F  \\
-G \end{bmatrix} .
+G \end{bmatrix} . \label{eq:ABCD}
 \end{equation}
- To calculate the entries of the sub-matrices composing $\mathcal{M}_n$, we consider horizontal and vertical, unit point forces $\mathbf{e}_1^j$ and $\mathbf{e}_2^j$ for $1 \leq j \leq N_B$, corresponding to each Lagrangian node. These are $2N_B$-arrays  given by
-\begin{align}
-(\mathbf{e}_1^j)_i =
-\begin{cases}
-0
- & \text{If $i \neq j$}, \\
-1 & \text{If $i=j$}
-\end{cases} \qquad 1 \leq i \leq 2N_B \label{eq:e1}
-\end{align}
-and 
-\begin{align}
-(\mathbf{e}_2^j)_i =
-\begin{cases}
-0
- & \text{If $i \neq j+N_B$}, \\
-1 & \text{If $i=j+N_B$}
-\end{cases} \qquad 1 \leq i \leq 2N_B.\label{eq:e2}
-\end{align}
-Then,  we have for  $1\leq i \leq 2N_B$ 
-\begin{align}
-(\mathcal{M}_{n})_{ij} &=(\mathcal{M}_n\mathbf{e}_1^j)_i \quad \text{for $1\leq j \leq N_B$} ,\\
-(\mathcal{M}_{n})_{ij} &=(\mathcal{M}_n\mathbf{e}_2^{j-N_B})_i \quad \text{for  $N_B + 1\leq j \leq 2N_B$} .
-\end{align}
-We define also
-\begin{gather}
-\mathbf{f}_1 = (1,0), \\
-\mathbf{f}_2 = (0,1).
-\end{gather}
-Now,
-\begin{align}
-(\mathcal{M}_n\mathbf{e}_1^j)_i &=
-\left( \alpha  h_B \,  \mathcal{S}^*_n \mathcal{L}_h  \left( \mathbf{f}_1 \delta_h (\mathbf{x}-\mathbf{X}_j) \right) \right)_i\\
-&=  \alpha h_B  \, \sum_{\mathbf{z} \in \mathcal{G}_\Omega} \mathcal{L}_h  \left( \mathbf{f}_1 \delta_h (\mathbf{x}-\mathbf{X}_j) \right) \delta_h(\mathbf{z}-\mathbf{X}_i)h^2 \\
-& \approx  \alpha h_B  \, \sum_{\mathbf{z} \in \mathcal{G}_\Omega} \mathcal{L}_h  \left( \mathbf{f}_1 \delta_h (\mathbf{x}) \right) \delta_h\left(\mathbf{z}-(\mathbf{X}_i-\mathbf{X}_j)\right)h^2
-\end{align}
-%\left( \alpha \,  \mathcal{S}^*_n \mathcal{L}_h 
-%\sum_{\mathbf{X}_k \in \mathcal{G}_B}  (\mathbf{e}_1^j)_k \delta_h (\mathbf{x}-\mathbf{X}_k) h_B \right)_i \\
-The last approximation allows us to define a single, vector valued function
-\begin{equation}
-T(\mathbf{y}) =  \alpha h_B \, \sum_{\mathbf{z} \in \mathcal{G}_\Omega} \mathcal{L}_h  \left( \mathbf{f}_1 \delta_h (\mathbf{x}) \right) \delta_h\left(\mathbf{z}-\mathbf{y}\right)h^2
-\end{equation}
-with respect to which we can compute the entries of the submatrices $A$ and $C$. We have
-\begin{equation}
-\begin{bmatrix} 
-(\mathcal{M}_n\mathbf{e}_1^j)_i \\
-(\mathcal{M}_n\mathbf{e}_1^j)_{i+N_B}
-\end{bmatrix} \approx
-T(\mathbf{X}_i-\mathbf{X}_j).
-\end{equation}
-Thus, the entries of the submatrices are given by
+Then from (\ref{eq:Mf})-(\ref{eq:Mg}) and the definition of the interfacial point forces (\ref{eq:f})-(\ref{eq:g}), it follows that
 \begin{align}
 \begin{bmatrix} A_{ij} \\ C_{ij} \end{bmatrix}
-\approx T(\mathbf{X}_i-\mathbf{X}_j).
+&\approx \mathbf{T}(\mathbf{X}_i-\mathbf{X}_j),
 \end{align}
-Similarly, we can obtain the submatrices  $B$ and $D$ by considering the vertical point forces $\mathbf{e}^j_2$. 
-Proceeding as before, we get
-\begin{equation}
-\begin{bmatrix} 
-(\mathcal{M}_n\mathbf{e}_2^j)_i \\
-(\mathcal{M}_n\mathbf{e}_2^j)_{i+N_B}
-\end{bmatrix} \approx
-U(\mathbf{X}_i-\mathbf{X}_j).
-\end{equation}
-where 
-\begin{align}
-U(\mathbf{y}) =  \alpha h_B \, \sum_{\mathbf{z} \in \mathcal{G}_\Omega} \mathcal{L}_h  \left( \mathbf{f}_2 \delta_h (\mathbf{x}) \right) \delta_h\left(\mathbf{z}-\mathbf{y}\right)h^2.
-\end{align}
-Hence,
+and
 \begin{align}
 \begin{bmatrix} B_{ij} \\ D_{ij} \end{bmatrix}
-\approx U(\mathbf{X}_i-\mathbf{X}_j).
+&\approx \mathbf{U}(\mathbf{X}_i-\mathbf{X}_j).
 \end{align}
-The domain of both $T$ and $U$ is $\Omega$. To expedite calculation we precompute both functions on the discretized grid $\mathcal{G}_\Omega$. Any value of $T$ or $U$ may now be approximated via an interpolation between values on grid points. Each evaluation $T(\mathbf{x})$ or $U(\mathbf{x})$ now costs only $\mathcal{O}(1)$ hence in this manner we construct the entire matrix representation of $\mathcal{M}_n$ with $\mathcal{O}(N_B^2)$ cost.
-Table~\ref{Table:MConstruct} gives the CPU time to construct the matrix in units of FE/BE, when $N_B=2N$. 
+The domain of both $\mathbf{T}$ and $\mathbf{U}$ is $\Omega$. To expedite the calculation we precompute both functions on the Eulerian grid $\mathcal{G}_\Omega$. The value of $\mathbf{T}$ or $\mathbf{U}$ at any other point is obtained via simple linear
+interpolation from the corresponding grid values. Thus, each evaluation of $\mathbf{T}$ or $\mathbf{U}$  costs only $O(1)$  and consequently, we construct in 
+this manner  the entire matrix representation of $\mathcal{M}_n$ at an optimal $O(N_B^2)$ cost.
+Table~\ref{Table:MConstruct} gives the CPU time to obtain the matrix in units of FE/BE, when $N_B=2N$. 
 \begin{table}
 \begin{center}
 \begin{tabular}{|c|c c c|}
 \hline
-%$N_b$ & 128 & 256 & 384 & 512 & 640 & 768 & 896 & 1024\\
-$N_b=2N$ &  256  & 512 & 1024 \\
+%$N_B$ & 128 & 256 & 384 & 512 & 640 & 768 & 896 & 1024\\
+$N_B=2N$ &  256  & 512 & 1024 \\
 \hline
 \textrm{Matrix construction} 
 & 1/3.3  & 1/1.8 &  1/2.5 \\
 \hline
 \end{tabular}
 \end{center}
-\caption{Average CPU time in FE/BE units to construct the matrix approximation to $\mathcal{M}_n$ for given $N_b=2N$}
+\caption{Average CPU time in FE/BE units to construct the matrix approximation to $\mathcal{M}_n$ for given $N_B=2N$}
 \label{Table:MConstruct}
 \end{table}
 
-
-\subsection{Error in approximating the matrix representation of $\mathcal{M}_n$}
-We proceed to show the error introduced via approximation in the above construction of $\mathcal{M}_n$ is not substantial. In what follows we assume our domain $\Omega = [0,1]\times[0,1]$. 
-We first require a bound on $G_h$, the Green's function used in (\ref{eq:G_h}). Given the vector fields
+\subsection{Error estimate for approximation of the matrix representation of $\mathcal{M}_n$}
+We proceed to obtain an error estimate for the above approximation of $\mathcal{M}_n$. In what follows we assume the periodic domain is $\Omega = [0,1]\times[0,1]$ and consider a uniform grid $\mathcal{G}_\Omega$ with grid size $h=1/N$. 
+We first require a bound on $G_h$, the Green's function used in (\ref{eq:G_h}). 
+Given the vector fields
 \begin{equation}
 \mathbf{g}_1(\mathbf{x}) = \begin{cases}
-(1,0)& \textrm{if } \mathbf{x} = \mathbf{0} \\
+(1/h^2,0)& \textrm{if } \mathbf{x} = \mathbf{0} \\
 (0,0)& \textrm{otherwise}
 \end{cases}
 \end{equation}
 and
 \begin{equation}
 \mathbf{g}_2(\mathbf{x}) = \begin{cases}
-(0,1)& \textrm{if } \mathbf{x} = \mathbf{0} \\
+(0,1/h^2)& \textrm{if } \mathbf{x} = \mathbf{0} \\
 (0,0)& \textrm{otherwise}
 \end{cases}
 \end{equation}
-defined for $\mathbf{x} \in \mathcal{G}_\Omega$
+defined for $\mathbf{x} \in \mathcal{G}_\Omega$, 
 $G_h$ is a $2\times 2$ matrix valued function given by
 \begin{equation}
-G(\mathbf{x})=
+G_h(\mathbf{x})=
 \left( \begin{array}{cc}
 u_1(\mathbf{x}) & u_2(\mathbf{x}) \\
 v_1(\mathbf{x}) & v_2(\mathbf{x})
-\end{array} \right),
+\end{array} \right),\label{eq:G_hDef}
 \end{equation}
-where $(u_1,v_1) = \mathcal{L}(\Delta t\mathbf{g}_1)$ and $(u_2,v_2) = \mathcal{L}(\Delta t\mathbf{g}_2)$.
-We make the following claims about the four components of $G$.
-\begin{claim}
-The $\sup$ norm of each component of $G_h$ over $\mathcal{G}_\Omega$ scales asymptotically like $\mathcal{O}(\log((\Delta t)^{-1} + h^{-1}))$.
-\end{claim}
+where $(u_1,v_1) = \mathcal{L}_h(\mathbf{g}_1)$ and $(u_2,v_2) = \mathcal{L}_h(\mathbf{g}_2)$.
+
+We make the following claims about the four components of $G_h$. In the estimates that follow, $C$ stands for a generic
+constant, not necessarily the same. 
+\begin{lemma}
+\label{lemma:Gh}
+If $\Delta t$ is proportional to $h$ then the $\sup$ norm of each component of $G_h$ over $\mathcal{G}_\Omega$ is bounded asymptotically by $C {\Delta t}^{-1}\log(h^{-1})$, where $C$ is a constant. 
+\end{lemma}
 \begin{proof}
-First, by definition and because $\hat{\mathbf{g}}_1(\mathbf{\xi}) \equiv (1,0)$ for all $(\xi_1,\xi_2) = \mathbf{\xi} \in \mathcal{G}_\Omega$ we have
+By definition of the fluid operator $\mathcal{L}_h$, we have 
 \begin{equation}
-\hat{u_1}(\mathbf{\xi})
-= 
-\Delta t\frac{1 - \sin(2\pi\xi_1)\hat{P}_1(\xi_1,\xi_2)/h}
-{\rho-\mu\Delta t \widehat{\nabla}^2}.
+(u_1,v_1) = (I -\nu\Delta t L_h)^{-1}  P_h \mathbf{g}_1.\label{eq:u1v1}
 \end{equation}
-Here $\hat{P}_1$ is the associated pressure. We now approximate
-\begin{eqnarray}
-\norm{u_1}_\infty &=&
-\max_{\mathbf{x}\in\mathcal{G}_\Omega} \left|
-C\sum_{\mathbf{\xi}\in\mathcal{G}_\Omega}
-e^{-2\pi\mathbf{x}\cdot\mathbf{\xi}} \hat{u}_1(\mathbf{\xi})
-\right| \\
-&\leq&
-C\sum_{\mathbf{\xi}\in\mathcal{G}_\Omega}
-\left| \hat{u}_1(\mathbf{\xi}) \right| \\
-&\leq&
-C\sum_{\mathbf{\xi}\in\mathcal{G}_\Omega}
-\frac{\Delta t}
-{\rho-\mu\Delta t \widehat{\nabla}^2(\mathbf{\xi})}
-\end{eqnarray}
-where $C$ is a normalization constant from the inverse DFT and the last inequality exploits the non-negativity of
-$-\sin(2\pi\xi_1)\hat{P}_1(\mathbf{\xi})/h$.
-Making use of trigonometric summation identities for cosine we may write 
+The right hand side of (\ref{eq:u1v1}) can be readily obtained in Fourier space.  Let 
+$\tilde{\mathcal{G}}_\Omega =\{ \mathbf{x}=(x,y)^T : \mathbf{x} \in \mathcal{G}_\Omega, x \neq 1, y \neq 1\}$
+and $\mathcal{G}_F =\{ \mathbf{k}=(k_1,k_2)^T :       |k_1|,|k_2| <N/2\}$. Then, we can define the 
+ discrete Fourier transform (DFT) of a doubly periodic function $F$  on $\tilde{\mathcal{G}}_\Omega$ by
+\begin{align}
+\widehat{F}(\mathbf{k}) =  \sum_{\mathbf{x} \in \tilde{\mathcal{G}}_\Omega} F(\mathbf{x}) e^{-2\pi i \mathbf{x}\cdot \mathbf{k}}
+\end{align}
+for $\mathbf{k} \in \mathcal{G}_F$ with discrete Fourier inverse
+\begin{align}
+F(\mathbf{x}) =\frac{1}{N^2} \sum_{\mathbf{k} \in \mathcal{G}_F} \widehat{F}(\mathbf{k}) e^{2 \pi i \mathbf{x}\cdot \mathbf{k}}
+\label{eq:IFT}
+\end{align}
+for $\mathbf{x} \in \tilde{\mathcal{G}}_\Omega $. Then, for $\mathbf{k} \in \mathcal{G}_F$  and $|\mathbf{k}| \ne 0$, 
+direct calculation gives us:
+\begin{align}
+|\widehat{P_h \mathbf{g}_1}(\mathbf{k})| = |\hat{\mathbf{g}}_1(\mathbf{k})-|\widehat{D}_h|^{-2}\widehat{D}_h\widehat{D}_h\cdot\hat{\mathbf{g}}_1(\mathbf{k})| \leq |\hat{\mathbf{g}}_1(\mathbf{k})| = 1/h^2
+\end{align}
+and we set  the zero mode ($\mathbf{k}=\mathbf{0}$) of the discrete projection to zero. 
+Using (\ref{eq:u1v1}) together with the inverse DFT (\ref{eq:IFT}) we have
 \begin{equation}
--\widehat{\nabla}^2(\mathbf{\xi}) 
-\equiv
-\frac{1}{h^2}\left(
-4 - 2\cos^2(2\pi\xi_1) - 2\cos^2(2\pi\xi_2)
-\right)
-=
-\frac{1}{h^2}\left(
-4\sin^2(\pi\xi_1) + 4\sin^2(\pi\xi_2)
-\right).
+\norm{u_1}_\infty =
+\frac{1}{N^2}\max_{\mathbf{x}\in\mathcal{G}_\Omega}
+\left|\sum_{\mathbf{k}\in\mathcal{G}_F}
+e^{2\pi i\mathbf{x}\cdot\mathbf{k}}
+\hat{u}_1(\mathbf{k})\right|
+\leq
+\frac{1}{N^2}\sum_{\mathbf{k}\in\mathcal{G}_F}
+\left|\frac{1/h^2}
+{1-\nu\Delta t \widehat{L_h}(\mathbf{k})}\right|,
 \end{equation}
-Furthermore, the inequality $\sin x \geq 2x/\pi$ for $0 \leq x \leq \pi/2$ implies $\sin(\pi\xi_l) \geq 2\xi_l$ for $0 \leq \xi_l \leq 1/2$ and $l=1,2$. Using this and the symmetry of $\sin(\pi\xi_l)$ about $\xi_l=1/2$ we obtain
+Here the Fourier symbol of the five-point Laplacian $L_h$ can be written as
 \begin{equation}
-\norm{u_1}_\infty \leq
-\sum_{\begin{array}{c}
-\mathbf{\xi} \in \mathcal{G}_\Omega \\
-0 \leq \xi_1,\xi_2 \leq 1/2 \end{array}}
-\frac{4C}
-{\rho(\Delta t)^{-1}+16\mu|\mathbf{\xi}|^2}.
+\begin{split}
+-\widehat{L}_h(\mathbf{k}) 
+&=
+\frac{1}{h^2}\left[
+4 - 2\cos(2 \pi k_1h) - 2\cos(2 \pi k_2h)
+\right] \\
+&=
+\frac{4}{h^2}\left[
+\sin^2(\pi k_1h) + \sin^2(\pi k_2h)
+\right].
+\end{split}
 \end{equation}
-We will bound this last summation by a double integral.
-Supposing $\Delta t$ is sufficiently small the denominator of the above summand satisfies
+Furthermore, using the inequality $\sin (x/2) \geq x/\pi$ for $0 \leq x \leq \pi$ and bounding the resulting sum by an integral, we get
 \begin{equation}
-\rho(\Delta t)^{-1}+16\mu|\xi|^2 >
-\frac{1}{4}\left(\rho(\Delta t)^{-1}+16\mu|\mathbf{\xi}+\mathbf{\epsilon}|^2\right)
+\begin{split}
+\norm{u_1}_\infty &\leq
+\sum_{\mathbf{k} \in \mathcal{G}_F }
+\frac{1}{1 + 16\nu\Delta t |\mathbf{k}|^2}
+\leq C \int_0^{\frac{\sqrt{2} }{2h}}\frac{1}{1 + 16\nu\Delta t r^2}rdr \\
+&= \frac{C}{16 \nu \Delta t} \log[ 1 + 8 \nu \Delta t h^{-2}].
+\end{split}
 \end{equation}
-for any $(\epsilon_1,\epsilon_2) = \mathbf{\epsilon} \in [0,h]\times[0,h]$, hence the summand satisfies
-\begin{eqnarray}
-\frac{1}{\rho(\Delta t)^{-1}+16\mu|\mathbf{\xi}|^2}
-&=&
-\frac{1}{h^2}\int_0^h\int_0^h
-\frac{1}{\rho(\Delta t)^{-1}+16\mu|\mathbf{\xi}|^2}
-d\mathbf{\epsilon} \\
-&<&
-\frac{1}{h^2}\int_{\xi_1}^{\xi_1+h}\int_{\xi_2}^{\xi_2+h}
-\frac{4}{\rho(\Delta t)^{-1}+16\mu|\mathbf{x}|^2}
-d\mathbf{\epsilon}.
-\end{eqnarray}
-Applying the above to the entire sum we obtain
-\begin{eqnarray}
-\norm{u_1}_\infty
-&<&
-16C\int_0^{1/2}\int_0^{1/2}
-\frac{1}{\rho(\Delta t)^{-1}+16\mu|\mathbf{x}|^2}
-d\mathbf{x} \\
-&<&
-16C\int_0^{2\pi}\int_0^{\sqrt{2}/2}
-\frac{r}{\rho(\Delta t)^{-1}+16\mu r^2}
-drd\theta \\
-&=&
-\frac{\pi C}{2\mu} \log\left(\rho(\Delta t)^{-1}+16\mu \frac{N^2}{2}\right)
-\end{eqnarray}
-where we have changed to polar coordinates and made use of the integrand's positivity to safely expand the bounds of integration to a circle circumscribing the original square bounds. The above calculation can be modified to provide a lower bound of equal order thus showing that $\norm{u_1}_\infty = \mathcal{O}(\log((\Delta t)^{-1} + h^{-1}))$.
-The remaining three components of $G_h$ may be shown to have the same order growth via similar calculations.
+Thus, if $\Delta t \propto h$ then $\norm{u_1}_\infty \leq C {\Delta t}^{-1}\log(h^{-1})$ for sufficiently small $h$.
+The remaining three components of $G_h$ can be shown to have the same type of bound via similar calculations.
 \end{proof}
 
-
-Consider now two fiber points, say $\mathbf{X}_1=(x_1,y_1)$ and $\mathbf{X}_2=(x_2,y_2)$, with a point horizontal force on $\mathbf{X}_2$ of unit magnitude. If we spread this force we obtain a vector field with $x$-component given by
+Consider now two fiber points, say $\mathbf{X}_1$ and $\mathbf{X}_2$, with a point horizontal force on $\mathbf{X}_2$ of unit magnitude. If we spread this force we obtain a vector field $(f,0)$ where
 \begin{equation}
-f(\mathbf{x}) = \delta_h(\mathbf{x} - \mathbf{X}_2).
+f(\mathbf{x}) = \delta_h(\mathbf{x} - \mathbf{X}_2)h_B.
 \end{equation}
-Convolving this with the Green function's component $u_1$ gives the $x$-component of the velocity field generated by the spread force at $\mathbf{X}_2$. We call this scalar field $u$. It is given by
+Substituting this vector field into our fluid solver we obtain $(u,v)=\mathcal{L}_h(f,0)$, where
 \begin{equation}
 u(\mathbf{x}) \equiv
 \sum_{\mathbf{x}_2\in\mathcal{G}_\Omega}
-u_1(\mathbf{x}-\mathbf{x}_2)\delta_h(\mathbf{x}_2-\mathbf{X}_2)h^2.
+u_1(\mathbf{x}-\mathbf{x}_2)\delta_h(\mathbf{x}_2-\mathbf{X}_2)h^2h_B \label{eq:ux}
 \end{equation}
+and $u_1$ is one of the components of the discrete Green's function~(\ref{eq:G_hDef}). 
 The interpolated velocity of $u$ at $\mathbf{X}_1$ is
 \begin{equation}
 u(\mathbf{X}_1) \equiv
 \sum_{\mathbf{x}_1\in\mathcal{G}_\Omega}
-u(\mathbf{x}_1)\delta_h(\mathbf{x}_1 - \mathbf{X}_1)h^2.
+u(\mathbf{x}_1)\delta_h(\mathbf{x}_1 - \mathbf{X}_1)h^2. \label{eq:uX1}
 \end{equation}
-The value $A_{1,2} \equiv \Delta t u(\mathbf{X}_1)$ is exactly the horizontal displacement of $\mathbf{X}_1$ induced by a point horizontal force on $\mathbf{X}_2$ with unit magnitude. $A_{1,2}$ is one of four entries in $\mathcal{M}_n$ relating forces at $\mathbf{X}_2$ to displacement at $\mathbf{X}_1$. We will focus only on $A_{1,2}$. The remaining three values may be analyzed in a similar manner.
+The value $A_{1,2} \equiv \alpha u(\mathbf{X}_1)$ is exactly the horizontal displacement of $\mathbf{X}_1$ induced by a unit horizontal force on $\mathbf{X}_2$, where $\alpha = ({\Delta t})^2/\rho$ as before. $A_{1,2}$ is one of four entries in the matrix representation of $\mathcal{M}_n$ relating forces at $\mathbf{X}_2$ to displacement at $\mathbf{X}_1$. We will focus only on $A_{1,2}$. The remaining three values may be analyzed in a similar manner.
 
-We dub our approximation to $A_{1,2}$ by $A'_{1,2}$. We obtain our approximation by shifting both $\mathbf{X}_1$ and $\mathbf{X}_2$ an equal amount such that $\mathbf{X}_2$ lies exactly on an Eulerian intersection. That is we shift by $\mathbf{r}\in[-h/2,h/2)\times[-h/2,h/2)$ such that $\mathbf{X}_2 +\mathbf{r}\in\mathcal{G}_\Omega$. We then proceed as before, starting with a point horizontal force of unit magnitude at $\mathbf{X}_2+\mathbf{r}$. Spreading this force results in a vector-field with $x$-component given by
+We dub our approximation to $A_{1,2}$ by $\tilde{A}_{1,2}$.
+We obtain our approximation by shifting both $\mathbf{X}_1$ and $\mathbf{X}_2$ an equal amount such that $\mathbf{X}_2$ lies exactly on an Eulerian intersection. That is we shift by $\mathbf{r}\in[-h/2,h/2)\times[-h/2,h/2)$ such that $\mathbf{X}_2 +\mathbf{r}\in\mathcal{G}_\Omega$. We then proceed as before, starting with a unit horizontal force at $\mathbf{X}_2+\mathbf{r}$. Spreading this force results in a vector field with $x$-component given by
 \begin{equation}
-f'(\mathbf{x}) = \delta_h(\mathbf{x} - \mathbf{X}_2 - \mathbf{r}).
+\tilde{f}(\mathbf{x}) = \delta_h(\mathbf{x} - \mathbf{X}_2 - \mathbf{r})h_B.
 \end{equation}
-Convolving this with the Green function's component $u_1$ gives the $x$-component of the velocity field generated by the spread force at $\mathbf{X}_2+\mathbf{r}$. We call this scalar field $u'$. It is given by
+Setting $(\tilde{u},\tilde{v})=\mathcal{L}_h(\tilde{f},0)$ we have
 \begin{equation}
-u'(\mathbf{x}) \equiv
+\tilde{u}(\mathbf{x}) \equiv
 \sum_{\mathbf{x}_2\in\mathcal{G}_\Omega}
-u_1(\mathbf{x} - \mathbf{x}_2)\delta_h(\mathbf{x}_2 - \mathbf{X}_2 - \mathbf{r})h^2.
+u_1(\mathbf{x} - \mathbf{x}_2)\delta_h(\mathbf{x}_2 - \mathbf{X}_2 - \mathbf{r})h^2h_B. \label{eq:utx}
 \end{equation}
-Finally we obtain our approximation via $A'_{1,2} \equiv \Delta t u'(\mathbf{X}_1)$ where
+Finally we obtain our proposed approximation via $\tilde{A}_{1,2} \equiv \alpha \tilde{u}(\mathbf{X}_1+\mathbf{r})$ where
 \begin{equation}
-u'(\mathbf{X}_1) \equiv
+\tilde{u}(\mathbf{X}_1+\mathbf{r}) \equiv
 \sum_{\mathbf{x}_1\in\mathcal{G}_\Omega}
-u'(\mathbf{x}_1)\delta_h(\mathbf{x}_1 - \mathbf{X}_1 - \mathbf{r})h^2.
+\tilde{u}(\mathbf{x}_1)\delta_h(\mathbf{x}_1 - \mathbf{X}_1 - \mathbf{r})h^2. \label{eq:uts}
 \end{equation}
-We are now in a position to state a weak estimate for the error $|A_{1,2}-A'_{1,2}|$.
-\begin{claim}
-$|A_{1,2}-A'_{1,2}| \leq 2\Delta t \norm{u_1}_\infty$.
-\end{claim}
+
+Let $M_n$ be the exact matrix representation of $\mathcal{M}_n$ and $\tilde{M}_n$ be the approximate matrix representation of $\mathcal{M}_n$ arrived at via the methods given above. 
+We are then in a position to state an estimate for the error $\|M_n-\tilde{M}_n\|_{\infty}$.
+\begin{theorem}
+\label{thm:A}
+$\|M_n-\tilde{M}_n\|_{\infty} \leq C h^2 \log h^{-1}$ when both $\Delta t$ and $h_B$ are  proportional to $h$ and where $C$ is a constant. 
+\end{theorem}
 \begin{proof}
-Unpacking our definitions we have
-\begin{eqnarray}
-\nonumber
-A_{1,2}-A'_{1,2} &=& \Delta t
-\sum_{\mathbf{x}_1,\mathbf{x}_2\in\mathcal{G}_\Omega}
+Using (\ref{eq:ux})-(\ref{eq:uX1}), the fact that $A_{1,2} \equiv \alpha u(\mathbf{X}_1)$, and (\ref{eq:utx})-(\ref{eq:uts}) we have
+\begin{align}
+\begin{split}
+A_{1,2}-\tilde{A}_{1,2} &= 
+\alpha\sum_{\mathbf{x}_1,\mathbf{x}_2\in\mathcal{G}_\Omega}
 u_1(\mathbf{x}_1 - \mathbf{x}_2)
 \left[
 \delta_h(\mathbf{x}_1 - \mathbf{X}_1)
-\delta_h(\mathbf{x}_2 - \mathbf{X}_2) \right. \\ &&\qquad\left.
+\delta_h(\mathbf{x}_2 - \mathbf{X}_2) \right. \\ &\qquad\left.
 -
 \delta_h(\mathbf{x}_1 - \mathbf{X}_1 - \mathbf{r})
 \delta_h(\mathbf{x}_2 - \mathbf{X}_2 - \mathbf{r})
-\right]h^4
-\end{eqnarray}
+\right]h^4h_B
+\end{split}
+\end{align}
 hence,
-\begin{eqnarray} \nonumber
-|A_{1,2}-A'_{1,2}| &\leq&
-\Delta t \norm{u_1}_\infty
-\sum_{\mathbf{x}_1,\mathbf{x}_2\in\mathcal{G}_\Omega}
-\left|
-\delta_h(\mathbf{x}_1 - \mathbf{X}_1)
-\delta_h(\mathbf{x}_2 - \mathbf{X}_2) \right. \\ &&\qquad\left.
--
-\delta_h(\mathbf{x}_1 - \mathbf{X}_1 - \mathbf{r})
-\delta_h(\mathbf{x}_2 - \mathbf{X}_2 - \mathbf{r})
-\right|h^4 \\
-&\leq& \nonumber
-\Delta t \norm{u_1}_\infty
+\begin{align}
+\begin{split}
+|A_{1,2}-\tilde{A}_{1,2}|
+&\leq 
+\alpha\norm{u_1}_\infty
 \sum_{\mathbf{x}_1,\mathbf{x}_2\in\mathcal{G}_\Omega}
 \left[
 \delta_h(\mathbf{x}_1 - \mathbf{X}_1)
-\delta_h(\mathbf{x}_2 - \mathbf{X}_2) \right. \\ &&\qquad\left.
+\delta_h(\mathbf{x}_2 - \mathbf{X}_2) \right. \\ &\qquad\left.
 +
 \delta_h(\mathbf{x}_1 - \mathbf{X}_1 - \mathbf{r})
 \delta_h(\mathbf{x}_2 - \mathbf{X}_2 - \mathbf{r})
-\right]h^4 \\
-&=&
-2\Delta t \norm{u_1}_\infty.
-\end{eqnarray}
-The last inequality above makes use of the identity $\Sigma_{\mathbf{x}\in\mathcal{G}_\Omega}\delta_h(\mathbf{x}-\mathbf{y})h^2=1$ for any shift $\mathbf{y}\in\mathcal{G}_\Omega$.
+\right]h^4h_B \\
+&=
+\frac{2(\Delta t)^2}{\rho} \norm{u_1}_\infty h_B,
+\end{split}
+\end{align}
+where we have made use of the identity $\Sigma_{\mathbf{x}\in\mathcal{G}_\Omega}\delta_h(\mathbf{x}-\mathbf{y})h^2=1$ for any shift $\mathbf{y}\in\Omega$ in the last step of the estimate.
+Suppose that $\Delta t \propto h$ and $h_B \propto h$, then  from Lemma~\ref{lemma:Gh} we get that 
+$|A_{1,2}-\tilde{A}_{1,2}| \leq C h^2 \log h^{-1}$, for sufficiently small
+$h$.
+
+It is straightforward to extend the above estimate to all entries in the matrix $M_n-\tilde{M}_n$. This gives the desired $\|M_n-\tilde{M}_n\|_{\infty} \leq C h^2 \log h^{-1}$.
 \end{proof}
-Suppose that we fix $\Delta t = \alpha h$ for some value $\alpha>0$, then the above claim says that the error $|A_{1,2}-A'_{1,2}|$ is of size at most $\mathcal{O}(h\log h^{-1})$.
-To attain exact numerical values for the error we work within the context of the ellipse relaxation problem with $N_b=2N$.
-Assume that $M_1$ is the exact matrix representation of $\mathcal{M}_n$ and $M_2$ is the approximate matrix representation of $\mathcal{M}_n$ arrived at via the methods given above. We calculate both matrices and then compute the maximum norm between their difference. Two log-log graphs of the norm with respect to $N$ are given in figures \ref{fig:loglog15} and \ref{fig:loglog2}. In figure \ref{fig:loglog15} we have fixed $\Delta t = h$ and we see that the error is $\mathcal{O}(h^2)$. In figure \ref{fig:loglog2} we have fixed $\Delta t = .01h$ and our error worsens to $\mathcal{O}(h^{1.5})$.
+This error for the proposed, approximated matrix $\tilde{M}_n$
+is asymptotically smaller than the $O(h)$ error of the IB Method for points within a distance $O(h)$ of the immersed boundary~\cite{Mori2008}. Thus,  the approximated matrix $\tilde{M}_n$ can be use without any deterioration of the overall accuracy of the IB Method.
 
-It's clear that a shift is occurring where at first we have $\Delta t^p \gg h^q$ when $\Delta t = h$ and changing to $\Delta t^p \ll h^q$ when $\Delta t = .01h$. This suggests that $p=1$. We are thus maintaining first order accuracy in time, as would be expected, however we lose spatial accuracy due to the transitions between discrete and distributional delta functions, leading to $q=.5$. Nonetheless the overall error, even after linear interpolation, is still at worst $\mathcal{O}(h^{1.5})$ which is smaller than the $\mathcal{O}(h)$ error of the overarching method. Thus we can be confident that our approximations to $\mathcal{M}_n$ are not introducing any unwarranted error.
 
+ We calculate numerically both matrices and then compute the maximum norm between their difference for the standard example of
+ a relaxing elliptical bubble as described in Section~\ref{Sec:drop}. A log-log graph of the norm with respect to $h$ is given in 
+ Fig.~\ref{fig:loglog15}. Here, we have fixed $\Delta t = h$ and $N_B=2N$. We see that the error is approximately $O(h^2)$, a close match to the analytic result. More importantly we can numerically verify our approximation by looking at residuals. If we solve
+\begin{equation}
+\mathbf{X}^{n+1} = \tilde{M}_n\mathcal{A}_{h_B} (\mathbf{X}^{n+1}) + \mathbf{b}^n, \label{eq:Xnl}
+\end{equation}
+for $\mathbf{X}^{n+1}$ we calculate the residual
+\begin{equation}
+\mathbf{r} = \mathbf{b}^n - \mathbf{X}^{n+1} + \mathcal{M}_n\mathcal{A}_{h_B} (\mathbf{X}^{n+1}). \label{eq:Xnl}
+\end{equation}
+Generally $\norm{\mathbf{r}} < .001$ in our numerical experiments, which is typically on the order of our stopping criteria for our iterators. We note that this residual is highly dependent on the choice of delta function $\delta_h$. Delta functions which are less sensitive to translation provide better residuals. We note as well that if smaller residuals are desired it is possible to modify the methods presented in this paper by incorporating full fluid evaluations with $\mathcal{M}_n$ when calculating residuals used within the iterators we present. We have also had success in constructing more elaborate, higher dimensional lookup tables to use in the construction of $\tilde{M}_n$ which can be used to make the introduced error as small as desired with minimal additional CPU cost.
 
 \begin{figure}[!b]
   \begin{center}
-    \includegraphics[bb=0in 0in 7.7in 6.3in,width=4.8in,clip]{loglog15.pdf}
+    \includegraphics[bb=0in 0in 7.7in 6.3in,width=4.8in,clip]{matrixerror.pdf}
   \end{center}
-  \caption{\small Log-log plot of $\norm{M_1-M_2}_\infty$ with $\Delta t = h$}
+  \caption{\small Log-log plot of $\norm{M_n-\tilde{M}_n}_\infty$ with $\Delta t = h$. The continuous line is a fit with a line of slope 2.}
   \label{fig:loglog15}
-\hfill
-  \begin{center}
-    \includegraphics[bb=0in 0in 7.7in 6.3in,width=4.8in,clip]{loglog2.pdf}
-  \end{center}
-  \caption{\small Log-log plot of $\norm{M_1-M_2}_\infty$ with $\Delta t = .01h$}
-  \label{fig:loglog2}
 \end{figure}
 
-\subsection{Addtional considerations and optimizations concerning the matrix representation of $\mathcal{M}_n$}
-There are a few additional optimizations possible when constructing the matrix representation of $\mathcal{M}_n$.
-Note first that on a square domain $\Omega$ we have via symmetry that $U=T$, so only a single lookup table is required.
-For rectangular or otherwise irregular grids this symmetry does not hold, we do however have other symmetries, most importantly $T(\mathbf{x}) = T(-\mathbf{x})$ and $U(\mathbf{x}) = U(-\mathbf{x})$.
-In particular these symmetries imply that the matrix of $\mathcal{M}_n$ is symmetric. This reduces the cost of computing the matrix by half, roughly. The cost could be reduced further if interpolation were not used between grid points for evaluating values of $T$ and $U$. Unfortunately the resulting error introduced produces substantial artifacts in the simulation. A simple compromise is to use linear interpolation when calculating $T(\mathbf{x})$ if $|\mathbf{x}|$ is small and direct lookup otherwise. This is cheap, with only $\mathcal{O}(N_b)$ interpolations needed, because most fiber points are distant from each other, as well as accurate, because $T$ decays rapidly away from the origin. Alternatively we could employ an adaptive mesh on which to calculate $T$ and $U$, taking a dense grid around the origin where most of the structure lies. This would allow us to use direct lookup for all entries of $\mathcal{M}_n$ without a loss in accuracy. Note that for our simulations, and in particular for the costs given in table ~\ref{Table:MConstruct}, we only utilize the symmetry of the matrix of $\mathcal{M}_n$ to expedite the construction.
 
-A further reduction in cost can be had by only computing part of $\mathcal{M}_n$. Consider the case where $\mathcal{A}_{h_B}$ is linear. If we modify our definition of $\mathbf{b}^n$ to be
+\subsection{Additional considerations and optimizations concerning $\tilde{M}_n$}
+There are a few additional optimizations possible when constructing $\tilde{M}_n$, the matrix representation of $\mathcal{M}_n$.
+Note first that on a square domain $\Omega$ we have via symmetry that $\mathbf{U}=\mathbf{T}$, so only a single lookup table is required.
+For rectangular or otherwise irregular grids this symmetry does not hold, we do however have other symmetries; most importantly $\mathbf{T}(\mathbf{x}) = \mathbf{T}(-\mathbf{x})$ and $\mathbf{U}(\mathbf{x}) = \mathbf{U}(-\mathbf{x})$.
+These symmetries imply that the matrix of $\mathcal{M}_n$ is symmetric. This observation reduces the cost of computing the matrix roughly by half. The cost could be reduced further if interpolation were not used between grid points for evaluating values of $\mathbf{T}$ and $\mathbf{U}$. Unfortunately, the resulting error introduced in the simulation would be significant. A simple compromise is to use linear interpolation when calculating $\mathbf{T}(\mathbf{x})$ if $|\mathbf{x}|$ is small and direct lookup otherwise. This is inexpensive, with only $O(N_B)$ interpolations needed, because most fiber points are distant from each other, as well as accurate, because $\mathbf{T}$ and $\mathbf{U}$ and decay rapidly away from the origin. 
+Alternatively, we could employ an adaptive mesh on which to calculate $\mathbf{T}$ and $\mathbf{U}$, taking a dense grid around the origin where most of the structure lies. This would allow us to use direct lookup for all entries of $\mathcal{M}_n$ without much loss of accuracy. We do not pursue these strategies here and only utilize the symmetry of the matrix of $\mathcal{M}_n$ to expedite the construction as was done in the costs given in Table~\ref{Table:MConstruct}.
+
+A further reduction in cost can be had by only computing part of $\mathcal{M}_n$. Consider the case where $\mathcal{A}_{h_B}$ is linear, represented by the matrix $A_{h_B}$, and suppose $M_n$ is the matrix of $\mathcal{M}_n$. We approximate $M_n$ with a banded matrix $M_n^1$ and let $M_n^2 = M_n - M_n^1$. 
+Our linear system then looks like
 \begin{equation}
-\mathbf{b}^n=\Delta t\mathcal{S}^*_n\mathcal{L}_h(\Delta t\mathcal{S}_n\mathcal{A}_{h_B}\mathbf{X}^n + \rho\mathbf{u}^n - \Delta t\rho\mathbf{u}^n \cdot \nabla_h \mathbf{u}^n)
-\label{eqn:Modified_b}
+\mathbf{X}^{n+1} = M_n^1 A_{h_B} \mathbf{X}^{n+1}
++ M_n^2 A_{h_B} \mathbf{X}^{n+1} + \mathbf{b}^n.
 \end{equation}
-then we can find $\mathbf{X}^{n+1}$ by solving for the change
+We approximate $M_n^2 A_{h_B} \mathbf{X}^{n+1} \approx M_n^2 A_{h_B} \mathbf{X}^n$. Utilizing this and rewriting we have
 \begin{equation}
-\mathbf{X}^{n+1}-\mathbf{X}^n = \mathcal{M}_n \mathcal{A}_{h_B} (\mathbf{X}^{n+1}-\mathbf{X}^n) + \mathbf{b}^n.
+\mathbf{X}^{n+1} - \mathbf{X}^n = M_n^1 A_{h_B} (\mathbf{X}^{n+1} - \mathbf{X}^n)
++ M_n A_{h_B} \mathbf{X}^{n} + \mathbf{b}^n.
+\end{equation}
+We may absorb the term $M_n A_{h_B} \mathbf{X}^{n}$ into the definition of $\mathbf{b}^n$ leaving the system
+\begin{equation}
+\mathbf{X}^{n+1}-\mathbf{X}^n = M_n^1 A_{h_B} (\mathbf{X}^{n+1}-\mathbf{X}^n) + \mathbf{\tilde{b}}^n,
 \label{eqn:Modified_system}
 \end{equation}
-Here, however, the cumulative influence of effects between distant fiber points is quite small since we have already factored in their aggregate effect through $\mathbf{b}^n$, thus we may choose to ignore them, using only a banded component of the matrix of $\mathcal{M}_n$ to capture the pertinent influences. Typically the width of the band must increase as stiffness increases in order to ensure stability. This trick can lead to speed up in calculating the matrix as well as matrix-vector multiplication if sparse data structures are used. This is particularly helpful for problems with very large physical domains $\Omega$, when large distances between immersed fibers drastically diminish their influence on each other's stability. For instance, in our heart valve problem much of the horizontal boundary modeled with tethered nodes has little impact on the stability of the fiber comprising the valve. The corresponding entries in $\mathcal{M}_n$ relating these two parts of our immersed fibers could be held at zero if we utilized (\ref{eqn:Modified_b}) and (\ref{eqn:Modified_system}).
+where 
+\begin{equation}
+\mathbf{\tilde{b}}^n=\Delta t\mathcal{S}^*_n\mathcal{L}_h
+\left[\frac{\Delta t}{\rho} \mathcal{S}_n\mathcal{A}_{h_B}(\mathbf{X}^n) + \mathbf{u}^n - \Delta t\mathbf{u}^n \cdot \nabla_h \mathbf{u}^n \right].
+\label{eqn:Modified_b}
+\end{equation}
+Solving  (\ref{eqn:Modified_system})-(\ref{eqn:Modified_b}) yields a stable update 
+provided that the width of the band comprising $M_n^1$ is large enough.
+Typically, the width of the band must increase as stiffness increases to maintain stability. This  banded matrix approach can lead to a significant speed-up in calculating the system's matrix as well as in matrix-vector multiplication if sparse data structures are used. This is particularly helpful for problems with very large physical domains, where the influence of one immersed fiber onto 
+a distant one is drastically diminished by their large separation. For instance, in the 2D model of a heart valve presented in
+Section \ref{Sec:valve},  much of the horizontal boundary (walls)  has little impact
+on  the fiber comprising the valve. The walls, modeled with tethered nodes, are not the main contributors to the high stiffness of the
+problem. The corresponding entries of $M_n$ relating these two horizontal parts of the immersed boundary could be held at zero if we employ (\ref{eqn:Modified_system})-(\ref{eqn:Modified_b}) to determine the next configuration.
 
 
-
-\section{Application: Ellipse Relaxation}
+\section{Case I: An initially elliptical drop with linear $\mathcal{A}_{h_B}$}
 \label{Sec:drop}
-Consider a closed, continuous membrane $\mathbf{X}(s,t)$ with a force distribution given by $\mathcal{A}(\mathbf{X})=\sigma\mathbf{X}_{ss}$, where $\sigma$ is a (large) constant. We take our domain as $\Omega = [0,1]\times[0,1]$ with periodic boundary conditions and we fix $\mu=\rho=1$. Figure~\ref{fig:Ellipse} shows the initial and final configurations of the interface.
+We consider as our first example what has been the canonical test for methods intended to remove the severe stiffness of the IB method. This is the case of a closed, continuous membrane $\mathbf{X}(s,t)$ with a force distribution given by $\mathcal{A}(\mathbf{X})=\sigma\mathbf{X}_{ss}$, where $\sigma$ is a (large) constant. We take our domain as $\Omega = [0,1]\times[0,1]$ with periodic boundary conditions and we fix $\mu=\rho=1$. Initially, we have an elliptical drop and zero velocity and the drop relaxes toward the equilibrium configuration. Figure~\ref{fig:Ellipse} shows the initial and final configurations of the interface.
+
 We discretize $\mathcal{A}(\mathbf{X})$ as
 \begin{equation}
 \left(\mathcal{A}_{h_B}\mathbf{X}\right)_i = \frac{1}{h_B^2}\left(\mathbf{X}_{i+1}-2\mathbf{X}_i+\mathbf{X}_{i-1}\right),
@@ -747,17 +753,17 @@ where we have omitted the parentheses in the discrete force operator $\mathcal{A
   \caption{\small Initial configuration of fiber in bold and final rest configuration in dotted line.}
   \label{fig:Ellipse}
 \end{figure}
-Thus, the semi-implicit discretization produces the linear system
+Thus, Peskin's semi-implicit discretization with lagged operators  produces the linear system
 \begin{equation}
-\mathbf{X}^{n+1} = \mathcal{M}_n\mathcal{A}_{h_B} \mathbf{X}^{n+1} + \mathbf{b}^n
+\mathbf{X}^{n+1} = \mathcal{M}_n\mathcal{A}_{h_B} \mathbf{X}^{n+1} + \mathbf{b}^n,
 \end{equation}
- to be solved at each time step. Equivalently, we have
+where $\mathbf{b}$ is given by (\ref{eq:bn}),  to be solved at each time step. Equivalently, we have
 \begin{equation}
 (\mathit{I}- \mathcal{M}_n\mathcal{A}_{h_B}) \mathbf{X}^{n+1} = \mathbf{b}^n,
 \label{eq:LinearSystem}
 \end{equation}
-where $\mathit{I}$ is the $2N_b\times 2N_b$ identity matrix.
-The matrix $\mathit{I}- \mathcal{M}_n\mathcal{A}_{h_B}$ is symmetric and non-singular. Indeed, the argument in~\cite{TP92} for $\mathit{I}- S^*_n P_h S_n \mathcal{A}_{h_B}$ can be applied to this case as well, for suppose
+where $\mathit{I}$ is the identity operator.
+Note that $\mathit{I}- \mathcal{M}_n\mathcal{A}_{h_B}$ is symmetric and non-singular. Indeed, the argument in~\cite{TP92} for $\mathit{I}- S^*_n P_h S_n \mathcal{A}_{h_B}$ can be applied to this case as well, for suppose
 \begin{align}
 (\mathit{I}- \mathcal{M}_n\mathcal{A}_{h_B}) \mathbf{X} =0, \label{eq:homo}
 \end{align}
@@ -765,20 +771,21 @@ then multiplying both sides of (\ref{eq:homo}) by $\mathcal{A}_{h_B}$ and taking
 with $\mathbf{X}$ we get
 \begin{align}
 \begin{split}
-0=-(\mathbf{X}, \mathcal{A}_{h_B}\mathbf{X})_{I_B} + (\mathbf{X},\mathcal{A}_{h_B}\mathcal{M}_ n\mathcal{A}_{h_B} \mathbf{X})_{I_B} &= \\
--(\mathbf{X}, \mathcal{A}_{h_B}\mathbf{X})_{I_B} + (\mathcal{A}_{h_B}\mathbf{X},\mathcal{M}_n \mathcal{A}_{h_B} \mathbf{X})_{I_B} .
+0=-(\mathbf{X}, \mathcal{A}_{h_B}\mathbf{X})_{B} + (\mathbf{X},\mathcal{A}_{h_B}\mathcal{M}_ n\mathcal{A}_{h_B} \mathbf{X})_{B} &= \\
+-(\mathbf{X}, \mathcal{A}_{h_B}\mathbf{X})_{B} + (\mathcal{A}_{h_B}\mathbf{X},\mathcal{M}_n \mathcal{A}_{h_B} \mathbf{X})_{B} .
 \end{split}
   \label{eq:nonnegative}
 \end{align}
  Both terms in the left hand side of (\ref{eq:nonnegative}) are non-negative. Therefore, it follows that each has to be equal to zero and consequently
 \begin{align}
-(\mathbf{X},\mathcal{A}_{h_B}\mathbf{X})_{I_B} =0. 
+(\mathbf{X},\mathcal{A}_{h_B}\mathbf{X})_{B} =0. 
 \end{align}
 This implies that $\mathcal{A}_{h_B}\mathbf{X}=0$~\cite{TP92} and hence from (\ref{eq:homo}) we obtain that 
 $\mathbf{X}=0$. Thus (\ref{eq:LinearSystem}) has a unique solution.
 
-If the full matrix  $\mathit{M}_n$ is available (see the previous section for how to expedite its construction) it is easy to construct
-simple iterative schemes to solve (\ref{eq:LinearSystem}). For example, denoting the diagonal component of $\mathit{M}_n$ by $\mathit{M}_n'$   and letting $\mathit{M}_n'' = \mathit{M}_n - \mathit{M}_n'$ we can write an iteration of weighted Jacobi type:
+If the full matrix representation $\mathit{M}_n$ of $\mathcal{M}$ is available (see the previous section for how to expedite its construction) it is easy to construct
+simple iterative schemes to solve (\ref{eq:LinearSystem}). For example, denoting the diagonal component of $\mathit{M}_n$ by $\mathit{M}_n'$, letting 
+$\mathit{M}_n'' = \mathit{M}_n - \mathit{M}_n'$, and denoting by $A_{h_B}$ the matrix representation of $\mathcal{A}_{h_B}$ we can write an iteration of weighted Jacobi type:
 \begin{equation}
 \mathbf{X}^{n+1,k+1} = (1-a)\mathbf{X}^{n+1,k} 
 + a(\mathit{I}- \mathit{M}_n'\mathit{A}_{h_B})^{-1}
@@ -799,12 +806,14 @@ adequate residuals (on the order of the truncation error) and to maintain stabil
 \label{eqn:GaussSeidel}
 \end{equation}
 for $ i=1,2,\ldots,2N_B$, 
-where $B=(\mathit{I}- \mathcal{M}_n\mathcal{A}_{h_B})$  and  $0<a<1$. 
+where $B=(\mathit{I}- M_n A_{h_B})$  and  $0<a<1$. 
 While (\ref{eqn:GaussSeidel}) appears to converge slower than (\ref{eqn:ModJacobi}) in the numerical experiments
 it does, however, perform well as a smoother.
 
-The most efficient and robust approach we found to solve  (\ref{eq:LinearSystem}) is a simple algebraic multigrid. Suppose for simplicity that $N_b=2^m$ for some natural number $m$, we can then form a collection of Lagrangian grids of size $2^{m-1},2^m,\dots,2,1$, our original grid being the first level and coarser grids coming afterward.
-For a given level $l$ of the multigrid hierarchy the prolongation operator $\mathcal{P}_l$ takes a fiber $\mathbf{X}_{l+1}$ at level $l+1$ and adds a node between each pair of consecutive nodes equidistant between each. As a matrix,  $\mathcal{P}_l$ has dimensions $2\cdot 2^{m-l+1}\times 2\cdot 2^{m-l}$ and has the form
+The most efficient and robust approach we found to solve~(\ref{eq:LinearSystem}) for this test problem
+is a standard algebraic multigrid. Suppose for simplicity that $N_B=2^m$ for some natural number $m$. We can then form a collection of Lagrangian grids $\mathcal{G}^l$, $l=1, \ldots m$, with number of nodes equal to $2^m,2^{m-1},  \ldots, 2,1$.
+Our original grid corresponds to the first level, $l=1$, with coarser grids coming afterwards.
+For a given level $l$  of the multigrid hierarchy,  the prolongation operator $\mathcal{P}_l$ takes a fiber $\mathbf{X}_{l+1}$ at level $l+1$ and adds a node between each pair of consecutive nodes equidistant between each. As a matrix,  $\mathcal{P}_l$ has dimensions $2\cdot 2^{m-l+1}\times 2\cdot 2^{m-l}$ and has the form
 \begin{equation}
 \mathcal{P}_l = 
 \left( \begin{array}{cccc}
@@ -816,11 +825,11 @@ For a given level $l$ of the multigrid hierarchy the prolongation operator $\mat
 \end{array} \right).
 \end{equation}
 Restriction operators are taken to be the transposes of prolongation operators. Calling $\mathcal{K}_1 = (\mathit{I}- \mathcal{M}_n\mathcal{A}_{h_B})$ we define recursively $\mathcal{K}_l = \mathcal{P}_{l-1}^{\mathit{T}} \mathcal{K}_{l-1} \mathcal{P}_{l-1}$. The Gauss-Seidel iteration (\ref{eqn:GaussSeidel}) provides a good smoother for the multigrid.
-All together,  a single restriction, prolongation, and smoothing step look like
+All together,  a single restriction, prolongation, and smoothing step looks like
 \begin{itemize}
 \item Given a guess $\mathbf{X}_l$ to the linear problem
 \begin{equation}
-\mathcal{K}_l\mathbf{X}_l = \mathbf{b}_l
+\mathcal{K}_l\mathbf{X}_l = \mathbf{b}_l 
 \end{equation}
 calculate the residual and restrict it to the next lowest level
 \begin{equation}
@@ -834,47 +843,103 @@ calculate the residual and restrict it to the next lowest level
 \begin{equation}
 \mathbf{X}_l \leftarrow \mathbf{X}_l + \mathcal{P}_l \mathbf{X}_{l+1}
 \end{equation}
-\item Smooth the high frequency errors in $\mathbf{X}_l$ via an underrelaxed Gauss-Seidel or (\ref{eqn:ModJacobi}). Both iterators perform comparably as smoothers.
+\item Smooth the high frequency errors in $\mathbf{X}_l$ via an underrelaxed Gauss-Seidel.
 \end{itemize}
 The number of iterations needed depends more on the desired degree of accuracy than a requirement for stability. Typically a single iteration of a Full Multigrid Step with one V-cycle per level is sufficient to maintain stability. 
 Computationally, it appears to be preferable to use the approximate solution $\mathbf{X}^{n+1}$ we obtain from (\ref{eq:LinearSystem}) as the updated fiber position rather than applying (\ref{eq:Xt}) directly. This is because small errors in the solution to (\ref{eq:LinearSystem}) are amplified when $\mathcal{A}_{h_B}$ acts on it. 
 
 
 
-\subsection{Results for the linear ellipse}
-We present now the numerical results for the above model.
-The method discussed has five primary costs. First, when constructing the implicit system (\ref{eqn:Sys2}) we must calculate $\mathbf{b}^n$ via a fluid solve, with a cost of rougly one FE/BE. Second the cost of computing $\mathcal{M}_n$ is roughly one half FE/BE. Third is the cost of initializing the multigrid solver, calculating the coarse representations of $\mathcal{M}_n$ on the various levels of our grid. Use of sparse data structures is critical here to maintain $\mathcal{O}(N_B^2)$ cost. Fourth is the cost of our iterations to solve the linear system. Because matrix-vector multiplication is significantly cheaper than FE/BE (see table \ref{Table:MV}) a full multigrid step can be much cheaper than one FE/BE, the comparision improving as $N$ increases.
-The final cost is in computing $\mathbf{u}^{n+1}$ once $\mathbf{X}^{n+1}$ is known, involving another fluid solve with cost again roughly one FE/BE. We will see that the sum of these costs results in a single timestep costing roughly 5 FE/BE; however, the stability restraint on $\Delta t$ for FE/BE will be orders of magnitude smaller than for our implicit methods, ultimately leaving us with methods substantially cheaper.
+\subsection{Numerical results}
+We present now the numerical results for the above test model.
+The method discussed has five primary costs. First, when constructing the implicit system (\ref{eq:LinearSystem}) we must calculate $\mathbf{b}^n$ via a fluid solve, with a cost of roughly one FE/BE. Second, the cost of computing $M_n$ is roughly one half FE/BE. Third is the cost of initializing the multigrid solver, i.e. calculating the coarse representations of $M_n$ on the various levels of our grid. Use of sparse data structures is critical here to maintain $O(N_B^2)$ cost. Fourth, is the cost of our iterations to solve the linear system. Because matrix-vector multiplication is significantly cheaper than FE/BE (see Table~\ref{Table:MV}) a full multigrid step can be much more economical than one FE/BE and this advantage grows  as $N$ increases.
+The final cost is in computing $\mathbf{u}^{n+1}$ once $\mathbf{X}^{n+1}$ is known. This step involves another fluid solve with a cost of roughly one FE/BE. We will see that the sum of these costs for the semi-implicit method results in a single time-step that costs approximately 4 FE/BE. However, the stability restraint on $\Delta t$ for the FE/BE scheme for a stiff problem like this one is orders of magnitude smaller than that required by the semi-implicit discretization. Thus, our proposed approach yields a much superior computational strategy.
 
-We set the elasticity constant $\sigma=10^5$. The initial configuration of the fiber is an ellipse centered at (.5,.5) with semi-major axis length $.3$ and semi-minor axis length $.2$, as in figure \ref{fig:Ellipse}. As the simulation is run the ellipse attempts to stabilize to a circular configuration. The velocity of the fiber can reach roughly $500$ units before slowing. Taking a standard length to be the geometric mean of our radii, $.245$, we calculate the Reynold's number of our fluid to be approximately $100$.
+We set the elasticity constant $\sigma=10^5$ and take $N_B = 2N$. The initial configuration of the fiber is an ellipse given by
+\begin{equation}
+\mathbf{X}(s,0) = (0.5 + 0.3\cos(2\pi sh_B), 0.5 + 0.2\sin(2\pi sh_B)),
+\end{equation}
+for $s \in [0,1]$.
+%centered at (.5,.5) with semi-major axis length $.3$ and semi-minor axis length $.2$, as in figure \ref{fig:Ellipse}.
+As time elapses,  the interfacial tension drives the ellipse toward a circular (cylindrical) configuration. The velocity of the fiber can reach roughly $500$ units before it slows down toward equilibrium. Taking a standard length to be the geometric mean of our radii, $0.245$, we calculate the Reynolds number of our fluid to be approximately $100$.
 
-For explicit simulations we will use an FE/BE scheme with $\Delta t$ as large as allowable while maintaining stability, which we take to be approximately $\Delta t = .00025h$. For our implicit scheme we make use of a linear multigrid with stopping criteria of $\norm{\mathbf{r}}_{\infty}<30\Delta t$, where $\mathbf{r}$ is the residual $\mathbf{b}^n-(I-\mathcal{M}_n\mathcal{A}_{h_B})\mathbf{X}^{n+1,k}$ at the $k$th iterate and $\norm{\cdot}_{\infty}$ is the sup norm. Here $\Delta t$ is taken to be close to the CFL condition, which is given approximately by $\Delta t = .02h$. The CFL restraint actually depends on $\norm{\mathbf{u}^n}_{\infty}$ as well, but we approximate $\norm{\mathbf{u}^n}_{\infty}$ at a conservative value when arriving at a formula for $\Delta t$.
+As a reference for comparison, for fiber-explicit simulations we use the FE/BE scheme 
+ with $\Delta t$ as large as  stability permits, which we find to be approximately $\Delta t = 0.00025h$. For our implicit scheme we make use of a linear multigrid with stopping criteria of $\norm{\mathbf{r}^k}_{\infty}<30\Delta t$, where $\mathbf{r}^k$ is the residual $\mathbf{b}^n-(I-M_n A_{h_B})\mathbf{X}^{n+1,k}$ at the $k$th iterate and $\norm{\cdot}_{\infty}$ is the sup norm. Here $\Delta t$ is 
+ chosen to comply with the CFL condition as the convection term is treated explicitly. With a conservative estimate for the maximum 
+ velocity, the time-step is given approximately by $\Delta t = 0.02h$. 
+ \begin{table}
+\caption{Elliptical drop relaxation for Navier Stokes. The average CPU time per time-step and the total CPU time up to a simulation time of $T=0.005$ is given. $\Delta t$ is the time-step taken and is the maximum allowed while maintaining stability.}
+\label{table:EllipseConvectiveSims}
+\begin{center}
+\begin{tabular}{|c |c c c| c c c|}
+\hline
+& \multicolumn{3}{c|}{Explicit} & \multicolumn{3}{c|}{Implicit}\\
+$N$ & $\Delta t$ & Average & Total & $\Delta t$ & Average & Total\\
+\hline
+128 & $1.95\cdot 10^{-6}$ & 0.03 & 73.35 & $1.17\cdot 10^{-4}$ & 0.10 & 4.34 \\
+256 & $9.76\cdot 10^{-7}$ & 0.14 & 730.21 & $7.81\cdot 10^{-5}$ & 0.55 & 35.06\\
+384 & $6.51\cdot 10^{-7}$ & 0.34 & 2613.19 & $5.21\cdot 10^{-5}$ & 1.24 & 118.98\\
+512 & $4.87\cdot 10^{-7}$ & 0.63 & 6491.95 & $3.91\cdot 10^{-5}$ & 2.34 & 299.10\\
+\hline
+\end{tabular}
+\end{center}
+\end{table}
 
-The results of multiple simulations with varying timesteps for the explicit and implicit methods are given in table \ref{table:EllipseFEBESims} and table \ref{table:EllipseImplicitSims}. The rows in the table correspond to identical simulation runs with different $N$. We take $N_b = 2N$. The column marked average gives the average CPU time of a single timestep and following columns give the total CPU time up to the given simulation time $T$.
-
-We see that the implicit scheme costs roughly $4$ times as much per timestep, however, because $\Delta t$ can be taken up to the CFL restraint the scheme is roughly $20$ times faster than the explicit scheme in terms of total CPU time. This is a fairly modest gain. Increasing $\sigma$ does not give our implicit scheme an edge because larger $\sigma$ produces larger $\norm{\mathbf{u}^n}_{\infty}$ and hence a more restrictive CFL restraint.
-
-Methods have been proposed to remove the CFL restraint. Alternatively if our simulations use Stoke's flow then we can take arbitrarily sized timesteps with our implicit scheme while maintaining stability whereas the FE/BE method would remain mired in the same restrictive timesteps. We compare the two methods with Stoke's flow in tables \ref{table:EllipseFEBESimsStokes} and \ref{table:EllipseImplicitSimsStokes}.
-
-We note that caution must be used when taking large timesteps with the implicit discretizations used here. Larger timesteps lead to greater spurious current.
+The results of multiple simulations with varying $N$ for the explicit and implicit methods are given in 
+Table~\ref{table:EllipseConvectiveSims}. The rows in the table correspond to identical simulation runs with different $N$. The columns under the title Explicit relate data from the FE/BE simulations, whereas the Implicit columns relate data from the implicit simulations. The two columns marked Average give the average CPU time of a single timestep. The columns marked Total give total CPU time for the entire simulation, up to a simulation time of $T=0.005$.
 
 
-\subsection{An example of an ellipse with nonlinear $\mathcal{A}_{h_B}$}
-The method used for the ellipse detailed above takes advantage of the linearity of the system (\ref{eq:LinearSystem}). This is the simplest possible test problem to consider. We consider now an example of a model ellipse with a nonlinear force and detail how to adapt the method for the linear case.
+We see in Table~\ref{table:EllipseConvectiveSims}
+that the implicit scheme costs approximately $4$ times as much per time-step than FE/BE. However, because $\Delta t$ can be taken up to the CFL restraint, the scheme is roughly $20$ times faster than the explicit scheme in terms of total CPU time. 
+Here, the performance of the semi-implicit approach is limited by the presence of large convection (relative to  viscous dissipation) and the method achieves only a modest gain over the explicit alternative.  Of course, one could employ a suitable implicit discretization of the convection terms to remove the CFL constraint.  Effective options in this context have been proposed by
+Mori and Peskin~\cite{MP2008} and Hou and Shi~\cite{HS2008b}. We do not pursue this 
+here as our intent is to focus on the treatment of the tension forces. Alternatively, if we consider Stokes flow the semi-implicit method
+is no longer limited by a CFL restriction and we can take arbitrarily sized time-steps  while maintaining stability.
+We compare the performance of the two methods for Stokes flow in Table~\ref{table:EllipseStokesSims}. 
 
-We follow Mori and Peskin in \cite{MoriPeskin} for the setup of our nonlinear ellipse example. In the continuous case the fiber force distribution is given by
+In these simulations we have increased the total simulation time to $T = .05$. This simulation time is enough that the explicit methods may require unreasonable amounts of CPU time. We approximate the total CPU time for these longer simulations by calculating the average CPU time of a single timestep and multiplying by the number of timesteps the explicit simulation would require to complete. We use an asterisk here and in following tables to denote values based on these extrapolated values.
+
+While $\Delta t$ for our implicit simulation can be chosen with disregard to stability, care must still be taken to ensure accuracy. Here we only require the loose condition that $\Delta t < h$. This is sufficient to preserve the qualitative behavior of our immersed structure. We note that there are implicit discretizations of the IB method with higher order accuracy in time, see for example \cite{NFGK2007}. Many of these methods require very little additional work to implement and do not require much additional CPU time per timestep. These methods may allow IB simulations to maintain high accuracy while exploiting the large timesteps allowed by an implicit discretization.
+
+
+\begin{table}
+\caption{Ellipse relaxation for Stokes flows. The average CPU time per timestep and the total CPU time up to a simulation time of 
+$T=0.05$ is given. $\Delta t$ is the timestep taken. For the explicit scheme this is the maximum allowed while maintaining stability. The implicit scheme is unconditionally stable; the timestep taken is held constant as $N$ varies.  $^*$ denotes an extrapolated value.}
+\label{table:EllipseStokesSims}
+\begin{center}
+\begin{tabular}{|c |c c c| c c c|}
+\hline
+& \multicolumn{3}{|c|}{Explicit} & \multicolumn{3}{|c|}{Implicit}\\
+$N$ & $\Delta t$ & Average & Total & $\Delta t$ & Average & Total\\
+\hline
+128 & $1.95\cdot 10^{-6}$ & 0.03 & 683.96 & $0.001$ & 0.09 & 9.34\\
+256 & $9.76\cdot 10^{-7}$ & 0.15 & 7410.50 & $0.001$ & 0.53 &  53.08\\
+384 & $6.51\cdot 10^{-7}$ & 0.35 & $26555.30^*$ & $0.001$ & 1.24 & 123.86\\
+512 & $4.87\cdot 10^{-7}$ & 0.71 & $72669.41^*$ & $0.001$ & 2.32 & 232.05\\
+\hline
+\end{tabular}
+\end{center}
+\end{table}
+
+
+
+\section{Case II:   An initially elliptical drop with nonlinear $\mathcal{A}_{h_B}$}
+\label{Sec:Nonlinear}
+We consider now the case of the simple, initially elliptical membrane  with a nonlinear force and detail how to adapt the method from the previous linear case.
+
+We follow Mori and Peskin in \cite{MP2008} for the setup of this nonlinear $\mathcal{A}_{h_B}$  example. At the continuous level,  the fiber force distribution is given by
 \begin{equation}
 \mathbf{F} = \frac{\partial}{\partial s} (T\mathbf{t})
 \end{equation}
-where $\mathbf{t}(s)$ is the tangential unit vector to $\mathbf{X}$ at $s$ and $T(s)$ is the tension at $s$ given by
+where $\mathbf{t}(s,t)$ is the tangential unit vector to $\mathbf{X}(s,t)$ and $T(s,t)$ is the tension given by
 \begin{equation}
-T(s) = \left| \frac{\partial\mathbf{X}}{\partial s}(s) \right|
- +     \left| \frac{\partial\mathbf{X}}{\partial s}(s) \right|^2.
+T(s,t) = \left| \frac{\partial\mathbf{X}}{\partial s}(s,t) \right|
+ +     \left| \frac{\partial\mathbf{X}}{\partial s}(s,t) \right|^2.
 \end{equation}
-To discretize the above we introduce difference operators. For a function $f$ defined over $\mathcal{G}_B$ we define
+To discretize this interfacial force we introduce the following difference operators for  a function $f$ defined over $\mathcal{G}_B$:
 \begin{eqnarray}
-D_s^+f(s) = \frac{f(s+1)-f(s)}{h_b},\\
-D_s^-f(s) = \frac{f(s)-f(s-1)}{h_b}.
+D_s^+f(s) = \frac{f(s+1)-f(s)}{h_B},\\
+D_s^-f(s) = \frac{f(s)-f(s-1)}{h_B}.
 \end{eqnarray}
 We then define the discrete force distribution as
 \begin{equation}
@@ -883,31 +948,39 @@ We then define the discrete force distribution as
 \left| D_s^-\mathbf{X} \right|^2 \right)
 \frac{ D_s^-\mathbf{X} }{ \left| D_s^-\mathbf{X} \right| } \right).
 \end{equation}
-Note that there is no scalar constant $\sigma$. The stiffness in this model won't come from high fiber forces but rather small viscosity. We set $\rho = 1$, $\mu = .05,.005$. As usual the domain is $\Omega = [0,1]\times[0,1]$ which we discretize as $\Omega_h$, an $N\times N$ uniform Eulerian grid. The initial velocity of the fluid is $0$ everywhere. The fiber's initial configuration is given by
+Severe stiffness in this model is manifested when the interfacial elastic force is much larger than the viscous forces. Following
+Mori and Peskin~\cite{MP2008} we set $\rho = 1$ and either $\mu = .05$ or $\mu = .005$. As before the domain is $\Omega = [0,1]\times[0,1]$ which we discretize as $\Omega_h$, an $N\times N$ uniform Eulerian grid. As in the linear case, the initial velocity of the fluid is zero everywhere. The fiber's initial configuration is given by
 \begin{equation}
-\mathbf{X}(s) = (.5 + \cos(2\pi sh_b), .5 + \sin(2\pi sh_b)).
+\mathbf{X}(s,0) = (\frac{1}{2} + \frac{1}{3}\cos(2\pi sh_B), \frac{1}{2} + \frac{1}{4}\sin(2\pi sh_B)).
 \end{equation}
-The implicit simulation attempts to solve at each time step the nonlinear system
-\begin{equation}
-(I - \mathcal{M}_n\mathcal{A}_{h_B})\mathbf{X}^{n+1} = \mathbf{b}^n,
-\label{eqn:NonlinearSystem}
-\end{equation}
-where $\mathcal{M}_n$ and $\mathbf{b}^n$ are as in the linear case. The only difference here is the nonlinearity of $\mathcal{A}_{h_B}$. We could simply approximate $\mathcal{A}_{h_B}$ linearly and solve the resulting linear system as we did in the linear case. This is a simple and reasonably robust approach and is the method employed by Mori and Peskin in their first order method. However because our methods are relatively cheap we can afford the extra stability and accuracy we obtain by solving (\ref{eqn:NonlinearSystem}) via multiple Newton iterations. At each time step we perform Newton iterations until the sup norm of the residual is less than $10^{-4}$, typically $2$ or $3$ iterations (note that a single iteration per timestep would be identical to the linear approximation used by Mori and Peskin). The solution to the linear system obtained at each iteration of Newton's method is approximated via $3$ multigrid passes.
+With our implicit strategy we attempt to solve at each time step the {\em nonlinear} system (\ref{eq:Xnl})
+$$
+\mathbf{X}^{n+1} = \mathcal{M}_n\mathcal{A}_{h_B} (\mathbf{X}^{n+1}) + \mathbf{b}^n,
+$$
+where $\mathcal{M}_n$ and $\mathbf{b}^n$ are as in the linear case. We could simply approximate $\mathcal{A}_{h_B}$ linearly and solve the resulting linear system. This is easily accomplished because the Jacobian $J$ of $\mathcal{A}_{h_B}$ is negative semidefinite, hence  $I-\mathcal{M}_nJ$ is positive definite. Such linear approximation is simple and reasonably robust
+but not as stable as the implicit scheme with full nonlinear term. This linear approximation is the method employed by Mori and Peskin~\cite{MP2008} for their first order scheme. However, with our economical computational approach we can afford the extra stability (while maintaining accuracy) by solving the nonlinear system (\ref{eq:Xnl}) via Newton iterations. Specifically, at each time-step we perform Newton iterations until the sup norm of the residual is less than $10^{-4}$. This typically requires only $2$ or $3$ iterations. Note that a single iteration per timestep would be identical to the linear approximation used by Mori and Peskin. We expedite further the 
+computation by approximating the solution to the linear system at each one of Newton's iteration with 3 Multigrid cycles.
 
-Although we chose this model to allow comparison between the recent work of Mori and Peskin ~\cite{MP2008} and our own there are a few noteworthy differences between model and implementation. First, Mori and Peskin use an immersed fiber with mass while our own fiber is neutrally buoyant. And second, there are minor differences in the discretizations of the Navier-Stokes equations. Nonetheless we present the results from our numerical experiments in a format similar to that presented in ~\cite{MP2008}.
+\subsection{Numerical results}
+We choose this nonlinear test problem following Mori and Peskin ~\cite{MP2008} to have their results as a reference. However, 
+there is a  slight difference in the model in addition to the different discretizations employed; Mori and Peskin use an immersed fiber with finite mass while our own fiber is neutrally buoyant.  We present the results from our numerical experiments in a format similar to that presented in~\cite{MP2008} to facilitate comparisons.
 
 Let $N_T$ be the number of timesteps taken, with total simulation time fixed at $1$. We fix $N_B=2N$ as before. 
-In tables ~\ref{table:NonlinearEllipseSims_05CPU} and ~\ref{table:NonlinearEllipseSims_005CPU} the total CPU time is given for simulations with $\mu=.05$ and $\mu=.005$ respectively. In tables ~\ref{table:NonlinearEllipseSims_05Fluids} and ~\ref{table:NonlinearEllipseSims_005Fluids} the same times are given in terms of the cost of a FE/BE. In all four tables the columns under FE/BE hold the explicit result while the columns under $N_T=8$ and $N_T=16$ hold the implicit results, with $N_T$ as specified.
+Table~\ref{table:NonlinearEllipseSims_05Fluids}, for $\mu=0.05$, and Table~\ref{table:NonlinearEllipseSims_005Fluids}, 
+for $\mu=0.005$,  summarize the total computational cost in units of FE/BE's. The total CPU time for the same cases is displayed in
+  Table~\ref{table:NonlinearEllipseSims_05CPU} and Table~\ref{table:NonlinearEllipseSims_005CPU}, respectively.
+  In all four tables the columns under FE/BE hold the explicit result while the columns under $N_T=8$ and $N_T=16$ hold the implicit results, with $N_T$ as specified. 
 
-
+As noted in~\cite{MP2008}, the semi-implicit method becomes more efficient compared to the explicit (FE/BE) 
+scheme as $N$ increases and $\mu$ decreases (more stiffness). For $N_T=8$ and $N=512$ the proposed semi-implicit strategy is about 45 times faster than the explicit approach in the case of $ \mu=0.05$ and about 90 times faster for $\mu=0.005$. In contrast, the fully implicit
+approach in~\cite{MP2008} gives cost ratios in the range $12-16$ for the same parameters.
 
 
 \begin{table}
-\caption{Total CPU cost for the nonlinear ellipse model with $\mu=.05$.
-Values given are total CPU time divided by average CPU time of a single FE/BE timestep for the given $N$.}
+\caption{Total CPU cost for the nonlinear ellipse model with $\mu=0.05$. Values given are total CPU time divided by average CPU time of a single FE/BE timestep for the given $N$.}
 \label{table:NonlinearEllipseSims_05Fluids}
 \begin{center}
-\begin{tabular}{|c||c| c c|}
+\begin{tabular}{|c|c| c c|}
 \hline
 $N$ & FE/BE & $N_T = 8$ & $N_T = 16$\\
 \hline
@@ -918,12 +991,13 @@ $512$ & $2666$ & $59.3$ & $92.6$ \\
 \hline
 \end{tabular}
 \end{center}
+%\end{table}
 
-\caption{Total CPU cost for the nonlinear ellipse model with $\mu=.005$.
-Values given are total CPU time divided by average CPU time of a single FE/BE timestep for the given $N$.}
+%\begin{table}
+\caption{Total CPU cost for the nonlinear ellipse model with $\mu=0.005$. Values given are total CPU time divided by average CPU time of a single FE/BE timestep for the given $N$.}
 \label{table:NonlinearEllipseSims_005Fluids}
 \begin{center}
-\begin{tabular}{|c||c| c c|}
+\begin{tabular}{|c|c| c c|}
 \hline
 $N$ & FE/BE & $N_T = 8$ & $N_T = 16$\\
 \hline
@@ -934,26 +1008,30 @@ $512$ & $5333$ & $59.2$ & $101.9$ \\
 \hline
 \end{tabular}
 \end{center}
+\end{table}
 
-\caption{Total CPU time for the nonlinear ellipse model with $\mu=.05$.}
+\begin{table}
+\caption{Total CPU time for the nonlinear ellipse model with $\mu=0.05$.}
 \label{table:NonlinearEllipseSims_05CPU}
 \begin{center}
-\begin{tabular}{|c||c| c c|}
+\begin{tabular}{|c|c| c c|}
 \hline
 $N$ & FE/BE & $N_T = 8$ & $N_T = 16$\\
 \hline
-$64$ & $2.94$ & $.67$ & $1.33$ \\
+$64$ & $2.94$ & $0.67$ & $1.33$ \\
 $128$ & $20.89$ & $2.08$ & $3.75$ \\
 $256$ & $227.85$ & $9.05$ & $16.59$ \\
 $512$ & $1930.62$ & $42.94$ & $67.02$ \\
 \hline
 \end{tabular}
 \end{center}
+\end{table}
 
-\caption{Total CPU time for the nonlinear ellipse model with $\mu=.005$.}
+\begin{table}
+\caption{Total CPU time for the nonlinear ellipse model with $\mu=0.005$.}
 \label{table:NonlinearEllipseSims_005CPU}
 \begin{center}
-\begin{tabular}{|c||c| c c|}
+\begin{tabular}{|c|c| c c|}
 \hline
 $N$ & FE/BE & $N_T = 8$ & $N_T = 16$\\
 \hline
@@ -976,85 +1054,26 @@ $512$ & $3823.40$ & $42.45$ & $73.10$ \\
 
 
 
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-\section{Application; Heart Valve}
+\section{Case III: A model of a heart valve}
 \label{Sec:valve}
-We turn now to a more challenging application of the IB method. We consider a rigid valve immersed in blood flowing through an artery. The valve is indirectly restricted in motion by two hinges but is allowed to rotate. The valve, artery walls and hinges will all be modeled as immersed springs; all dynamics will be given gratis by the IB method once we provide the initial setup.
+\subsection{The model}
+We turn now to a more challenging application of the IB Method in which there are rigid immersed
+structures, tethered points, and crossed links. 
+We consider a 2D model of a rigid valve immersed in blood flowing through an artery. The valve is indirectly restricted in motion by two hinges but is allowed to rotate. The valve, artery walls, and hinges will all be modeled as immersed springs. The flow-structure interaction will be captured 
+via the IB Method.
 
-We take $\Omega=[0,2]\times[0,1]$ as our domain, again with periodic boundary conditions, which we discretize as a $2N\times N$ uniform gird. For a detail of the geometry of the problem see figure \ref{fig:ValveGeometry}. Note that the top and bottom of the artery walls include cushions in the shape of two hills. We simulate a horizontal flow from left to right through the artery by adding a forcing vector $\mathbf{f}_{j,k}=(v_{flow},0)$ to the heterogeneous force in (\ref{eqn:1Aa}), where in general $v_{flow}$ may be time dependent. This changes our explicit term $\mathbf{b}^n$ in our implicit system to
+
+We select the computational domain to be $\Omega=[0,2]\times[0,1]$  with periodic boundary conditions and  discretize it with a $2N\times N$ uniform grid. The geometry of the problem is
+represented in Fig.~\ref{fig:ValveGeometry} and a detailed depiction of the valve's linked structure is shown in Fig.~\ref{fig:Valve1}. The top and bottom of the artery walls include cushions in the shape of two hills. We simulate a horizontal flow through the artery by adding a forcing vector $\mathbf{f}_{j,k}=(v_{flow},0)$ to the right hand side of (\ref{eq:dmoment}), where in general $v_{flow}$ may be time dependent. This changes the explicit term $\mathbf{b}^n$ in our implicit system to
 \begin{equation}
-\mathbf{b}^n=\mathbf{X}^n + \Delta t\mathcal{S}^*_n\mathcal{L}_h(\rho\mathbf{u}^n - \Delta t\rho\mathbf{u}^n \cdot \nabla_h \mathbf{u}^n + \Delta t \mathbf{f}).
+\mathbf{b}^n=\mathbf{X}^n + \Delta t\mathcal{S}^*_n\mathcal{L}_h
+\left[ \mathbf{u}^n - \Delta t\mathbf{u}^n \cdot \nabla_h \mathbf{u}^n + \frac{\Delta t}{\rho} \mathbf{f} \right].
 \end{equation}
 \begin{figure}[!b]
   \begin{center}
-    \includegraphics[bb=1in .3in 11.5in 5.85in,width=5.25in,clip]{ValveGeometry.pdf}
+   \includegraphics[bb=1in .3in 11.5in 5.85in,width=5.25in,clip]{ValveGeometry.pdf}
   \end{center}
-  \caption{\small Configuration of our valve simulation. Larger nodes represent tether points. 1: Valve; 2: Cushions; 3: Hinges; 4: Artery wall}
+  \caption{\small Configuration of heart valve model. Larger nodes represent tether points. 1: Valve; 2: Cushions; 3: Hinges; 4: Artery wall.}
   \label{fig:ValveGeometry}
 \end{figure}
 \begin{figure}[!b]
@@ -1064,6 +1083,7 @@ We take $\Omega=[0,2]\times[0,1]$ as our domain, again with periodic boundary co
   \caption{\small Top: A fine grid approximation to the valve, showing only linkage. Bottom: 'x's mark the prolongation of a coarse valve marked in 'o'.}
   \label{fig:Valve1}
 \end{figure}
+
 All nodes in the wall and the two hinges are modeled as tethers, with one end of the tether fixed for all time. If $\mathbf{X}_i$ is a tethered point with base given by $\bar{\mathbf{X}}_i$ then the force generated by the tether is given by 
 \begin{equation}
 \mathbf{f}_i = -k_i (\mathbf{X}_i-\bar{\mathbf{X}}_i)
@@ -1071,169 +1091,217 @@ All nodes in the wall and the two hinges are modeled as tethers, with one end of
 \end{equation}
 where $k_i$ is the spring constant. For the body of the heart valve we will use springs between nodes. Suppose $\mathbf{X}_i$ is connected to multiple other nodes. If $\mathbf{X}_i$ is connected to $\mathbf{X}_j$ then let $k_{i,j}$ and $L_{i,j}$ be respectively the spring constant and resting length of the spring connecting them. If no connection exists between $\mathbf{X}_i$ and $\mathbf{X}_j$ then take $k_{i,j}$ to be zero. The force at $\mathbf{X}_i$ then is given by
 \begin{equation}
-\mathbf{f}_i = \sum_{j=1}^{N_b} -k_{i,j} \frac{\mathbf{X}_i-\mathbf{X}_j}{|\mathbf{X}_i-\mathbf{X}_j|}
+\mathbf{f}_i = \sum_{j=1}^{N_B} -k_{i,j} \frac{\mathbf{X}_i-\mathbf{X}_j}{|\mathbf{X}_i-\mathbf{X}_j|}
 (|\mathbf{X}_i-\mathbf{X}_j| - L_{i,j}).
 \label{eqn:LinkForce}
 \end{equation}
-Note that the force operator for our ellipse given by (\ref{eqn:LinearForce}) is exactly the force given by (\ref{eqn:LinkForce}) for a loop of fiber points connected by springs with suitable spring constants and zero resting length.
-For our valve though we require non-zero resting lengths in order to preserve the structure. Additionally, in order to maintain the rigidity of a solid body the spring constants must be taken very large, roughly $\mathcal{O}(10^9h^{-2})$. Similarly for the tether points representing the artery walls the spring constants must be very large to portray the tautness of the biological fibers. Because the current acts to bend the valve as it is penned between its hinges larger values of $v_{flow}$ require larger spring constants to maintain the structure. In Roma's original investigation of the problem the spring constants required to maintain rigidity led to restraints on the timestep on the order of $10^{-7}$ seconds, with the time scales of interest roughly on the order of $1$ second. Removing this stiffness here however is not so direct as with the simpler ellipse relaxation problem. Our problem is still given by the equation
-\begin{equation}
-\mathbf{X}^{n+1} = \mathit{M}_n\mathcal{A}_{h_B} \mathbf{X}^{n+1} + \mathbf{b}^n.
-\label{eqn:Sys2again}
-\end{equation}
-Obviously though a linear multigrid can't directly accommodate our system. 
-As noted we are making use of nonzero resting lengths for the springs comprising the valve and this leads to nonlinearities in our forcing function $\mathcal{A}_{h_B}$.
-When attempting to solve (\ref{eqn:Sys2again}) one can approximate $\mathcal{A}_{h_B}$ with various linear operators and hope to capture most of the pertinent dynamics, however our efforts in this direction proved fruitless. Newton iterations of (\ref{eqn:Sys2again}) converge quite well, shifting the problem to a linear problem which might appear to resemble the linear system for the ellipse relaxation problem. If we let $J(\mathbf{X})$ represent the Jacobian of $\mathit{A}_{h_B}$ at $\mathbf{X}$, then the Newton iteration is given by
-\begin{equation}
-(\mathit{I}-\mathit{M}_n\mathit{J}(\mathbf{X}^{n+1,k}))(\mathbf{X}^{n+1,k+1}-\mathbf{X}^{n+1,k})
-= \mathbf{b}^n - (\mathit{I}-\mathit{M}_n\mathit{A}_{h_B})\mathbf{X}^{n+1,k}.
-\label{eqn:NewtonIt}
-\end{equation}
-This does indeed resemble (\ref{eqn:LinearSystem}) with the linear $J$ replacing $\mathcal{A}_{h_B}$. Unfortunately multiplication against $J$ destroys the positive-definiteness of $\mathcal{M}_n$. To see this it suffices to show that $J$ has both positive and negative eigenvalues. We consider a simple case with four immersed boundary points forming a square with side lengths $\sqrt{2}$ and with links connecting the perimeter of the square. We vary the resting length $l$ of the connecting springs and compute the eigenvalues of the resulting forcing function's Jacobian. The results can be seen in figure \ref{fig:BoxEigenvalues}. We see that as the resting length approaches and surpasses the side length of the square the Jacobian loses its seminegative-definiteness. This is the basic observation for most arbitrary structures. For our valve we take the resting length to be the starting length of the links comprising the valve, we thus immediately lose seminegative-definiteness once we perturb the valve structure.
+Note that the force operator (\ref{eqn:LinearForce}) employed for the elliptical membrane problem 
+is exactly the force given by (\ref{eqn:LinkForce}) for a loop of fiber points connected sequentially by springs with suitable spring constants and zero resting length. 
+However, for our valve model we require non-zero resting lengths to preserve the structure and as a consequence we end up with a nonlinear force density.
+Additionally, the problem is severely stiff. To maintain the rigidity of a solid body,  we find that the
+ spring constants must be $O(10^9h^{-2})$. Similarly, for the tether points representing the artery walls, the spring constants must also be very large to portray the tautness of the biological fibers. Furthermore, because the forcing flow acts to bend the valve as it is penned between its hinges,  larger values of $v_{flow}$ require larger spring constants to preserve the structure. 
+To illustrate the stiffness, a time integration of the equations of motion with an explicit treatment 
+of the interfacial force and with a modest spatial resolution ($N=256$) requires the time-step to be 
+$O(10^{-7})$.  
 
-Because of this the conjugate gradient method no longer converges. Biconjugate gradient method on the other hand fairs better, converging but not in an acceptable number of iterations. Biconjugate gradient may take upward of $100$ iterations to converge satisfactorily. A major obstacle in accelerating convergence is that the natural preconditioner $I-\mathcal{M}_n'J$ does not capture the dynamics of our system well. Indeed a Jacobi iteration analogous to (\ref{eqn:ModJacobi}) has very poor convergence, requiring strong underrelaxation and thousands of iterations. Without adequate smoothers we can't hope for an efficient linear multigrid to solve our Newton iteration. Smoothers for the nonlinear system (\ref{eqn:Sys2again}) were likewise difficult to uncover, seemingly ruling out a nonlinear multigrid.
+ Removing this stiffness for this more prototypal IB Method problem is considerably  more challenging than in the case of the simple elliptical fiber. The implicit system we would like to solve is still given 
+ by~(\ref{eq:Xnl}):
+$$
+\mathbf{X}^{n+1} = \mathcal{M}_n\mathcal{A}_{h_B} (\mathbf{X}^{n+1}) + \mathbf{b}^n.
+$$
+As noted above, due to the nonzero resting lengths of the springs comprising the valve, 
+$\mathcal{A}_{h_B}$ is nonlinear. Moreover, unlike the case of the elliptical interface with
+nonlinear force density,  the Jacobian $J$ of $\mathcal{A}_{h_B}$ is not semidefinite and the resulting matrix $I - M_nJ$ can be shown to lack definiteness as well.
 
-Note that for simpler geometries similar to those in the ellipse relaxation problem one may expect a direct generalization of the previous methods used in the linear example to extend, even with nonlinear forcing. For instance different forcing functions for other geometries may yield Jacobians such that $\mathcal{M}_nJ$ is positive definite, in which case a linear multigrid may be used to solve the Newton iterations (\ref{eqn:NewtonIt}). Alternatively other nonlinear problems may possess suitable smoothers to allow for a nonlinear multigrid to directly solve (\ref{eqn:Sys2again}). Nonetheless for the present problem we must change directions.
+The breakdown of the definiteness of $J$ can be seen in a very simple case. Consider four immersed boundary points at $(1,0),(0,1),(-1,0),(0,-1)$, forming a square with side lengths $\sqrt{2}$ and with links connecting the perimeter of the square. We vary the resting length $l$ of the connecting springs and compute the eight eigenvalues of the resulting force density's Jacobian. The results are plotted in
+Fig.~\ref{fig:BoxEigenvalues}. We see that as the resting length approaches and surpasses the side length of the square the Jacobian loses its negative semi-definiteness. This seems to be generic
+for most immersed structures. For our 2D valve model, we take the resting length to be the starting length of the links comprising the valve. Thus,  we  lose immediately negative semi-definiteness once we perturb the valve structure.
 
+Due to the lack of positive definiteness of $I-M_nJ$  the Conjugate Gradient Method does not converge. The Biconjugate Gradient Method converges but may take in excess of $100$ iterations to attain a satisfactory residual. A major obstacle in accelerating convergence is that the natural preconditioner $I-M_n'J$ (recall $M_n'$ is the diagonal part of $M_n$) does not capture well the dynamics of this system. Indeed, a Jacobi iteration analogous to (\ref{eqn:ModJacobi}) has very poor convergence, requiring strong underrelaxation and thousands of iterations. Without adequate smoothers, an efficient  multigrid for the linear system in Newton's iteration is not a viable option. Smoothers for the nonlinear system (\ref{eq:Xnl}) were likewise difficult to uncover, seemingly ruling out a nonlinear multigrid. We propose next a very different approach,  which consists of splitting the 
+problem to take simultaneous advantage of the fast convergence of Newton's method and the efficiency of multigrid. 
 \begin{figure}[!b]
   \begin{center}
     \includegraphics[bb=.15in .15in 8in 6in,width=5.25in,clip]{BoxEigenvalues.pdf}
   \end{center}
-
   \caption{\small Eigenvalues for the Jacobian of a fiber forcing function for four points linked as a square with varying resting length.}
   \label{fig:BoxEigenvalues}
 \end{figure}
 
 \subsection{Solving the implicit system}
-We consider first the simplest possible iterator for (\ref{eqn:Sys2again}), the fixed point iteration given by
+Perhaps the simplest iterator for (\ref{eq:Xnl}) is the fixed point iteration given by
 \begin{equation}
-\mathbf{X}^{n+1,k+1} = \mathit{M}_n\mathcal{A}_{h_B} \mathbf{X}^{n+1,k} + \mathbf{b}^n.
+\mathbf{X}^{n+1,k+1} = \mathit{M}_n\mathcal{A}_{h_B} (\mathbf{X}^{n+1,k}) + \mathbf{b}^n.
 \label{eqn:fixedpoint}
 \end{equation}
-The first thing we must observe about this iteration is that it fails spectacularly, in fact if our initial guess is $\mathbf{X}^{n+1,0}=\mathbf{X}^n$ then $\mathbf{X}^{n+1,1}$ is the explicit update provided by a FE/BE scheme which we know to be unstable for reasonable $\Delta t$. Intuitively, additional iterations of (\ref{eqn:fixedpoint}) can only exacerbate the instability: small errors in $\mathbf{X}^{n+1,k}$ are amplified enormously by $\mathcal{A}_{h_B}$ resulting in large errors in $\mathbf{X}^{n+1,k+1}$. This is precisely why taking our solution of (\ref{eqn:Sys2again}) as our updated $\mathbf{X}^{n+1}$ rather than using (\ref{eqn:1Ac}) provides more stability, as using (\ref{eqn:1Aa}) is equivalent to pushing $\mathbf{X}^{n+1}$ through a fixed point iteration. Any errors present would be amplified.
+However, this method fails spectacularly. This is not entirely surprising.
+ If our initial guess is $\mathbf{X}^{n+1,0}=\mathbf{X}^n$ then $\mathbf{X}^{n+1,1}$ is the explicit update provided by the FE/BE scheme which is unstable for practical $\Delta t$. Additional iterations of (\ref{eqn:fixedpoint}) exacerbate the instability: small errors in $\mathbf{X}^{n+1,k}$ are amplified enormously by $\mathcal{A}_{h_B}$ resulting in large errors in $\mathbf{X}^{n+1,k+1}$.  As 
+ remarked in the context of the elliptical interface case, this is why it is preferable to use the approximate solution to (\ref{eq:LinearSystem}) as the updated configuration $\mathbf{X}^{n+1}$ rather than employing~(\ref{eq:uL}). 
+ %Doing so provides more stability, as using (\ref{eq:uL}) is equivalent to pushing $\mathbf{X}^{n+1}$ through the fixed point iteration (\ref{eqn:fixedpoint}). Any errors present would be amplified.
 
 The eigenvalues of $J$ are at least on the order of the spring constants comprising our valve. It should seem natural to take advantage of this by reversing the fixed point iteration (\ref{eqn:fixedpoint}). Consider the alternative fixed point iteration
 \begin{equation}
 \left\{
 \begin{gathered}
 \mathit{M}_n\mathbf{F}^{k+1} = \mathbf{X}^{n+1,k} - \mathbf{b}^n,\\
-\mathcal{A}_{h_B}\mathbf{X}^{n+1,k+1} = \mathbf{F}^{k+1}.
+\mathcal{A}_{h_B}(\mathbf{X}^{n+1,k+1}) = \mathbf{F}^{k+1}.
 \end{gathered}
 \right.
 \label{eqn:fixedpoint2}
 \end{equation}
-First we solve for $\mathbf{F}^{k+1}$. This is the force distribution that we would need to exist on the fiber at time $t^n$ in order that after the current timestep the fiber would be updated through (\ref{eqn:1Ac}) to be located at our current guess $\mathbf{X}^{n+1,k}$. The linear system we must solve only involves the linear positive definite operator $\mathcal{M}_n$, thus we can efficiently solve it using a multigrid. Second we determine what configuration $\mathbf{X}^{n+1,k+1}$ gives rise to this force through $\mathcal{A}_{h_B}$.
-In many problems there is a unique $\mathbf{X}^{n+1,k+1}$ such that
-$\mathcal{A}_{h_B}\mathbf{X}^{n+1,k+1} = \mathbf{F}^{k+1}$. For our current problem this is not the case.
+First, we solve for $\mathbf{F}^{k+1}$, the force distribution that would move the fiber from $\mathbf{X}^n$ to $\mathbf{X}^{n+1,k}$ after a single timestep. The linear system we must solve only involves the linear positive definite operator $\mathcal{M}_n$, thus we can efficiently solve it using (linear)multigrid. Second, we determine what configuration $\mathbf{X}^{n+1,k+1}$ gives rise to this force through $\mathcal{A}_{h_B}$.
+In many applications there is a unique $\mathbf{X}^{n+1,k+1}$ such that
+$\mathcal{A}_{h_B}(\mathbf{X}^{n+1,k+1}) = \mathbf{F}^{k+1}$. For the current problem this is not the case.
 
-To see this note that our valve is a neutrally buoyant object, detached from any fixed points, and the internal forces generated by perturbations in the valve's structure are unaffected by translation. Consider $\mathbf{e}_1$, a vector of length $2N_b$ equal to zero in every component except those corresponding to x-components of a node in our valve and similarly $\mathbf{e}_2$ for y-components. $\mathbf{e}_1$ and $\mathbf{e}_2$ are then horizontal and vertical translation vectors, $\mathbf{X}+\mathbf{e}_1$ representing the same configuration as $\mathbf{X}$ with the valve shifted right by one unit. Shifting has no influence on the force density,
+To see this note that valve is modeled as a neutrally buoyant object, detached from any fixed points, and the internal forces generated by perturbations in the valve's structure are unaffected by translation. More precisely let $\mathcal{G}_V$ be all indices $l$ such that $\mathbf{X}_l$ is a fiber point belonging to the valve. We consider then two translation vectors $\mathbf{V}^1$ and $\mathbf{V}^2$ given by
 \begin{equation}
-\mathcal{A}_{h_B}(\mathbf{X}+\mathbf{e}_1) = \mathcal{A}_{h_B}(\mathbf{X}+\mathbf{e}_2) = \mathcal{A}_{h_B}\mathbf{X},
+\mathbf{V}^1_l =
+\begin{cases}
+(1,0)& \textrm{if } l\in \mathcal{G}_V, \\
+(0,0)& \textrm{otherwise},
+\end{cases}
 \end{equation}
-thus $\mathcal{A}_{h_B}$ is not injective and we may not have a unique solution to (\ref{eqn:fixedpoint2}). Indeed, $\mathcal{A}_{h_B}$ is not surjective either so (\ref{eqn:fixedpoint2}) may have no solution at all. This follows physically from conservation of momentum and angular momentum: $\mathcal{A}_{h_B}$ can't directly generate forces that move or rotate the valve. Translation and rotation can only be introduced via the fluid. 
+\begin{equation}
+\mathbf{V}^2_l =
+\begin{cases}
+(0,1)& \textrm{if } l\in \mathcal{G}_V, \\
+(0,0)& \textrm{otherwise}.
+\end{cases}
+\end{equation}
+$\mathbf{V}^1$ and $\mathbf{V}^2$ are horizontal and vertical translation vectors, $\mathbf{X}+\mathbf{V}^1$ representing the same configuration as $\mathbf{X}$ with the valve shifted right by one unit. Shifting has no influence on the force density,
+\begin{equation}
+\mathcal{A}_{h_B}(\mathbf{X}+a_1 \mathbf{V}^1) = \mathcal{A}_{h_B}(\mathbf{X}+a_2 \mathbf{V}^2) = \mathcal{A}_{h_B}\mathbf{X},
+\end{equation}
+where $a_1$ and $a_2$ are arbitrary scalars.
+Thus,  $\mathcal{A}_{h_B}$ is not injective and we may not have a unique solution to (\ref{eqn:fixedpoint2}). In fact, $\mathcal{A}_{h_B}$ is not surjective either so (\ref{eqn:fixedpoint2}) may have no solution at all. This follows physically from conservation of linear momentum and angular momentum: $\mathcal{A}_{h_B}$ cannot directly generate forces that move or rotate the valve. Translation and rotation can only be introduced via the fluid interaction. 
 
-To analyze rotation we introduce the operator $R_{\theta}$ which takes in a configuration $\mathbf{X}$ and returns the configuration obtained by rotating the valve by $\theta$ about some point. The point of rotation is arbitrary. We take it to be the center of the valve at the previous timestep,
+To analyze rotation we introduce the operator $R_{\theta}$ which takes in a configuration $\mathbf{X}$ and returns the configuration obtained by rotating the valve by $\theta$ about some fixed point. This point of rotation is arbitrary and we take it to be the center of the valve at the previous time-step:
 \begin{equation}
 \mathbf{x}_c = 
-\left(\frac{\langle \mathbf{X}^n, \mathbf{e}_1\rangle}{\langle \mathbf{e}_1, \mathbf{e}_1\rangle}, 
-\frac{\langle \mathbf{X}^n, \mathbf{e}_2\rangle}{\langle \mathbf{e}_2, \mathbf{e}_2\rangle}\right).
+\left(\frac{( \mathbf{X}^n, \mathbf{V}^1)_B}{( \mathbf{V}^1, \mathbf{V}^1)_B}, 
+\frac{( \mathbf{X}^n, \mathbf{V}^2)_B}{( \mathbf{V}^2, \mathbf{V}^2)_B}\right).
 \label{eqn:Center}
 \end{equation}
 We define also
 \begin{equation}
-\mathbf{e}_3(\mathbf{X}) = \frac{\partial}{\partial \theta}R_\theta(\mathbf{X}) = (-\tilde{Y},\tilde{X}),
+\mathbf{V}^3(\mathbf{X}) = \frac{\partial}{\partial \theta}R_\theta(\mathbf{X}). 
 \label{eqn:e3}
 \end{equation}
-where $(\tilde{X},\tilde{Y})=\mathbf{X}-\mathbf{x}_c$ are the components of $\mathbf{X}$ in the coordinate system where $\mathbf{x}_c$ is the origin. $\mathbf{e}_3$ is the Jacobian of $R_\theta$ and is a column vector of length $2N_b$.
-
-
-$\mathbf{e}_1,\mathbf{e}_2,\mathbf{e}_3$ together represent three vectors outside the image of $\mathcal{A}_{h_B}$ associated with translation and rotation.
-We have then that there exist solutions to (\ref{eqn:fixedpoint2}) only when $\mathbf{F}^{k+1}$ does not act to translate or rotate the valve. That is, a vector $\mathbf{F}$ lies in the image of $\mathcal{A}_{h_B}$ only when 
+We may equivalently define $\mathbf{V}^3$ via
 \begin{equation}
-\langle \mathbf{F}, \mathbf{e}_j(\mathbf{X}^{n+1,k}) \rangle = 0
+\mathbf{V}^3_l =
+\begin{cases}
+(-Y_l+y_c,X_l-x_c)& \textrm{if } l\in \mathcal{G}_V, \\
+(0,0)& \textrm{otherwise},
+\end{cases}
+\end{equation}
+where $\mathbf{X}_k=(X_k,Y_k)$ and $\mathbf{x}_c = (x_c,y_c)$. $\mathbf{V}^3$ is the Jacobian of $R_\theta$. Note that $\mathbf{V}^3$ depends on a configuration $\mathbf{X}$. We use the
+notation $\mathbf{V}^3(\mathbf{X})$ to emphasize this dependence.
+
+The vectors $\mathbf{V}^1,\mathbf{V}^2,\mathbf{V}^3$ represent points outside the image of $\mathcal{A}_{h_B}$ associated with translation and rotation. Then, 
+we have that there exist solutions to (\ref{eqn:fixedpoint2}) only when $\mathbf{F}^{k+1}$ does not act to translate or rotate the valve. That is, a vector $\mathbf{F}$ lies in the image of $\mathcal{A}_{h_B}$ only when 
+\begin{equation}
+( \mathbf{F}, \mathbf{V}^j )_B = 0 \quad
 \textrm{ for } j=1,2,3.
 \label{eqn:FCondition}
 \end{equation}
-To see this mathematically consider the simplest case. Suppose we have only two immersed fiber points
+Indeed, consider first the simplest case of only two immersed fiber points
 \begin{equation}
 \mathbf{X}=
 \left( \begin{array}{c}
-x_1\\x_2\\y_1\\y_2
+(x_1,y_1)\\
+(x_2,y_2)
 \end{array} \right)
 \end{equation}
-and there is a single link between them. Then the force they generate is
+connected with a single link. Then,  the force they generate is
 \begin{equation}
 \mathbf{F}=T
-\left( \begin{array}{c}
-x_2-x_1\\x_1-x_2\\y_2-y_1\\y_1-y_2
-\end{array} \right)
+\left[ \begin{array}{c}
+(x_2-x_1,y_2-y_1)\\
+(x_1-x_2,y_1-y_2)
+\end{array} \right]
 \end{equation}
 for some tension scalar $T$.
-The rotation vector about the origin is simply $\mathbf{e}_3=(-y_1,-y_2,x_1,x_2)^T$. We have then that
-\begin{eqnarray}
-\langle \mathbf{F},\mathbf{e}_3 \rangle &=&
-T(-y_1,-y_2,x_1,x_2)
-\left( \begin{array}{c}
-x_2-x_1\\x_1-x_2\\y_2-y_1\\y_1-y_2
-\end{array} \right) \\
-&=& T\left(y_1(x_1-x_2)+y_2(x_2-x_1)+x_1(y_2-y_1)+x_2(y_1-y_2)\right)=0.
-\end{eqnarray}
-A similar calculation shows that $\langle \mathbf{e}_1,\mathbf{F} \rangle = \langle \mathbf{e}_2,\mathbf{F} \rangle = 0.$
-For our more complicated valve we simply have a summation of such forces, thus our forcing function must satisfy (\ref{eqn:FCondition}) where $\mathbf{F}=\mathcal{A}_{h_B}\mathbf{X}$ for any configuration $\mathbf{X}$. In general though most arbitrary vectors $\mathbf{F}$ won't satisfy (\ref{eqn:FCondition}) and we won't be able to find a solution to (\ref{eqn:fixedpoint2}). To remedy this we must factor out those components sitting outside the image of $\mathcal{A}_{h_B}$. This is easier to do with the linearized $\mathcal{A}_{h_B}$, where we may simply project onto the vector space free of the problematic vectors $\mathbf{e}_1,\mathbf{e}_2,\mathbf{e}_3$. This suggests the modified Newton iteration to approximately solve for $\mathbf{X}^{n+1,k+1}$ in (\ref{eqn:fixedpoint2}),
+The rotation vector about the origin is simply 
+\begin{equation}
+\mathbf{V}^3=
+\left[ \begin{array}{c}
+(-y_1,x_1)\\
+(-y_2,x_2)
+\end{array} \right].
+\end{equation}
+We have then that
+\begin{equation}
+( \mathbf{F},\mathbf{V}^3 )_B =
+-y_1(x_2-x_1) + x_1(y_2-y_1) - y_2(x_2-x_1) + x_2(y_1-y_2) = 0.
+\end{equation}
+A similar calculation shows that $( \mathbf{V}^1,\mathbf{F} )_B = ( \mathbf{V}^2,\mathbf{F} )_B = 0$.
+For our more complicated valve structure  we simply have a summation of such forces, thus the
+corresponding  force density must satisfy (\ref{eqn:FCondition}) where 
+$\mathbf{F}=\mathcal{A}_{h_B}(\mathbf{X})$ for any configuration $\mathbf{X}$. In general, an arbitrary vector $\mathbf{F}$ may not satisfy (\ref{eqn:FCondition}) and we would be unable to find a solution to (\ref{eqn:fixedpoint2}). To remedy this we must factor out those components  outside the image of $\mathcal{A}_{h_B}$. This is easier to do with the linearized $\mathcal{A}_{h_B}$, its Jacobian, where we may simply project onto the vector space free of the problematic vectors $\mathbf{V}^1,\mathbf{V}^2,\mathbf{V}^3$. These 
+observations suggest the modified Newton iteration to approximately solve for $\mathbf{X}^{n+1,k+1}$ in (\ref{eqn:fixedpoint2}):
 \begin{equation}
 \left\{
 \begin{gathered}
-J(\mathbf{X}^{n+1,k+1,l})(\mathbf{X}^{n+1,k+1,l+1} - \mathbf{X}^{n+1,k+1,l}) = P(\mathbf{F}^{k+1} - \mathcal{A}_{h_B}\mathbf{X}^{n+1,k+1,l}),\\
-\mathbf{X}^{n+1,k+1,0} = \mathbf{X}^{n+1,k}
+\mathbf{X}^{n+1,k+1,0} = \mathbf{X}^{n+1,k} , \\
+\begin{split}
+J(\mathbf{X}^{n+1,k+1,l})(\mathbf{X}^{n+1,k+1,l+1}& - \mathbf{X}^{n+1,k+1,l})   \\
+& = P(\mathbf{F}^{k+1} - \mathcal{A}_{h_B}(\mathbf{X}^{n+1,k+1,l})),
+\end{split}
 \end{gathered}
 \right.
 \label{eqn:AnewtonProj}
 \end{equation}
 where
 \begin{equation}
-P(\mathbf{F}) = \mathbf{F} - \sum_{i=1}^3 \mathbf{e}_i(\mathbf{X}^{n+1,k})\langle\mathbf{F},\mathbf{e}_i(\mathbf{X}^{n+1,k})\rangle
+P(\mathbf{F}) = \mathbf{F} - \sum_{j=1}^3 \mathbf{V}^j(\mathbf{X}^{n+1,k})(\mathbf{F},\mathbf{V}^j(\mathbf{X}^{n+1,k}))_B 
 \label{eqn:project}
 \end{equation}
-is the projection operator onto rotation and translation free force distributions. Because each node in the valve is linked to only a few other nodes $J$ is $\mathcal{O}(N_b)$ sparse. We can solve systems involving $J$ efficiently with various sparse solvers. Additionally the structure of $J$ never changes throughout a simulation, though its values do, so we may make additional optimizations in the sparse solver if desired.
+is the projection operator onto rotation and translation free force distributions. Note that because each node in the valve is linked to only a few other nodes, $J$ is $O(N_B)$ sparse. We can solve systems involving $J$ efficiently with various sparse solvers. Additionally, the structure of $J$ never changes throughout a simulation, though its values do, so we may make additional optimizations in the sparse solver if desired.
 
-Linear systems of the form $J\mathbf{X}=P\mathbf{F}$ are, strictly speaking, overdetermined by three degrees of freedom. To rectify this we simply isolate three degrees of freedom in $\mathbf{X}$ and fix them. These variables must be associated with the valve but are otherwise arbitrary. We could, for instance, fix the $x$ and $y$ component of a single node in the valve as well as the $x$ component of an additional node. Once fixed we may proceed to solve for $\mathbf{X}$ such that $J\mathbf{X}=P\mathbf{F}$ is satisfied at all other free points. What is important, however, is that iterations of (\ref{eqn:AnewtonProj}) in such a manner will converge to an $\mathbf{X}$ that satisfies $\mathcal{A}_{h_B}\mathbf{X}=P\mathbf{F}$ at all points, even those we fixed. In this sense we arrive at an updated configuration $\mathbf{X}^{n+1,k+1}$ which satisfies (\ref{eqn:fixedpoint2}) up to components outside the image of $\mathcal{A}_{h_B}$.
+Linear systems of the form $J\mathbf{X}=P\mathbf{F}$ are, strictly speaking, over determined by three degrees of freedom. To rectify this we simply isolate three degrees of freedom in $\mathbf{X}$ and fix them. These variables must be associated with the valve but are otherwise arbitrary. We could, for instance, fix the $x$ and $y$ component of a single node in the valve as well as the $x$ component of an additional node. Once fixed,  we may proceed to solve for $\mathbf{X}$ such that $J\mathbf{X}=P\mathbf{F}$ is satisfied at all other free points. What is important, however, is that iterations of (\ref{eqn:AnewtonProj}) in such a manner will converge to an $\mathbf{X}$ that satisfies $\mathcal{A}_{h_B}\mathbf{X}=P\mathbf{F}$ at all points, even at those we fixed. In this sense we arrive at an updated configuration $\mathbf{X}^{n+1,k+1}$ which satisfies (\ref{eqn:fixedpoint2}) up to components outside the image of $\mathcal{A}_{h_B}$.
 
-Iterations of (\ref{eqn:fixedpoint2}) typically provide square convergence. The limit need not be, and usually isn't, a solution to (\ref{eqn:Sys2again}). The limit is, however, a stable update for our configuration $\mathbf{X}$. As an aside, it is important to note that this iteration converges precisely because the standard fixed point iteration (\ref{eqn:fixedpoint}) diverges. As we modify the parameters of our simulation though, for instance if we were to drastically decrease the spring constants, then (\ref{eqn:fixedpoint}) may converge whereas (\ref{eqn:fixedpoint2}) would diverge. There may, therefore, be instances with mixed spring constants, both large and small, where neither iteration converges.
-For our case with large spring constants everywhere there is no problem, (\ref{eqn:fixedpoint}) converges rapidly. Indeed increasing the spring constants aids in the convergence.
+The sequence $\mathbf{X}^{n+1,0}, \mathbf{X}^{n+1,1}, \mathbf{X}^{n+1,2}, \dots$ formed by iterations of (\ref{eqn:fixedpoint2}) typically converges quadratically in the $l^2$ norm.
+As an aside, it is important to note that the iterative method (\ref{eqn:fixedpoint2}) converges precisely because the standard fixed point iteration (\ref{eqn:fixedpoint}) diverges. As we modify the parameters of our simulation, for instance,  if we were to drastically decrease the spring constants, then (\ref{eqn:fixedpoint}) may converge whereas (\ref{eqn:fixedpoint2}) would diverge. There are situations with mixed large and small spring constants where neither iteration converges. The crosslinks of our valve model is one such example. In the case of large spring constants everywhere (\ref{eqn:fixedpoint2}) converges rapidly and increasing the spring constants aids in the convergence.
 
-Of course this iteration, as it is currently formulated, does not allow for translation or rotation of our valve. Thus, while it may provide stable updates it does not lead to physically acceptable simulations. We must somehow reintroduce translation and rotation in our simulation.
-The simplest method to do this is to use the location and angle of the valve configuration obtained from an explicit update. To accomplish this we may simply take our initial guess $\mathbf{X}^{n+1,0}$ for iterations of (\ref{eqn:AnewtonProj}) to be
+The limit of our iterations is a stable update of the immersed boundary configuration but is not in general a solution to (\ref{eq:Xnl}). We need to reintroduce translation and rotation to correct for this 
+discrepancy. We can achieve this in many different ways. Perhaps the simplest method is  to use the location and angle of the valve configuration obtained from an explicit update. To accomplish this we may simply take our initial guess $\mathbf{X}^{n+1,0}$ for iterations of (\ref{eqn:AnewtonProj}) to be
 \begin{equation}
-\mathbf{X}^{n+1,0} = R_{\theta}\mathbf{X}^n + \mathbf{e}_1\langle\tilde{\mathbf{X}}-\mathbf{X}^n,\mathbf{e}_1\rangle
-+ \mathbf{e}_2\langle\tilde{\mathbf{X}}-\mathbf{X}^n,\mathbf{e}_2\rangle
+\mathbf{X}^{n+1,0} = R_{\theta}\mathbf{X}^n + \mathbf{V}^1(\tilde{\mathbf{X}}-\mathbf{X}^n,\mathbf{V}^1)_B
++ \mathbf{V}^2(\tilde{\mathbf{X}}-\mathbf{X}^n,\mathbf{V}^2)_B
 \label{eqn:InitialGuess}
 \end{equation}
 where
 \begin{equation}
-\theta = \langle\tilde{\mathbf{X}}-\mathbf{X}^n
--\mathbf{e}_1\langle\tilde{\mathbf{X}}-\mathbf{X}^n,\mathbf{e}_1\rangle
--\mathbf{e}_2\langle\tilde{\mathbf{X}}-\mathbf{X}^n,\mathbf{e}_2\rangle
-,\mathbf{e}_3(\mathbf{X}^n)\rangle
+\theta = (\tilde{\mathbf{X}}-\mathbf{X}^n
+-\mathbf{V}^1(\tilde{\mathbf{X}}-\mathbf{X}^n,\mathbf{V}^1)_B
+-\mathbf{V}^2(\tilde{\mathbf{X}}-\mathbf{X}^n,\mathbf{V}^2)_B
+,\mathbf{V}^3(\mathbf{X}^n))_B
 \end{equation}
 and
 \begin{equation}
 \tilde{\mathbf{X}} = \mathbf{X}^n + \mathcal{M}_n\mathcal{A}_{h_B}\mathbf{X}^n
 \end{equation}
-is the FE/BE update prediction. Here we are taking the FE/BE prediction for the following timestep $\tilde{\mathbf{X}}$ and extracting its location and angle. We then take our current configuration $\mathbf{X}^n$ and modify the location and angle of the valve to match that in $\tilde{\mathbf{X}}$. Afterward we may proceed to apply iterations of (\ref{eqn:AnewtonProj}) and since this doesn't introduce translation or rotation we will maintain the location and angle we extracted from the FE/BE prediction.
+Here, we are taking the FE/BE predictor $\tilde{\mathbf{X}}$ and extracting its location and angle. We then take the current configuration $\mathbf{X}^n$ and modify the location and angle of the valve to match that in $\tilde{\mathbf{X}}$. After this, 
+ we may proceed to apply iterations of (\ref{eqn:AnewtonProj}) which will preserve the location and angle we extracted from the FE/BE predictor.
 
 Other predictors may be employed as well. 
-For instance we may rediscretize our problem on a coarser grid, solve for the updated timestep, prolong the solution to our original fine grid and extract its gross properties. In fact solving (\ref{eqn:fixedpoint2}) via iterations of (\ref{eqn:AnewtonProj}) is a good nonlinear smoother, opening the possibility for a nonlinear multigrid. Other predictors may involve higher order explicit update mechanisms for computing $\tilde{\mathbf{X}}$ or treating the valve as a true rigid body and predicting its motion through rigid body dynamics.
+For instance we may rediscretize our problem on a coarser grid, solve for the updated time-step, prolong the solution to the original fine grid and extract its gross properties. 
+%In fact solving (\ref{eqn:fixedpoint2}) via iterations of (\ref{eqn:AnewtonProj}) is a good nonlinear smoother, opening the possibility for a nonlinear multigrid. 
+Other predictors may involve higher order explicit updates $\tilde{\mathbf{X}}$ or treating the valve as a true rigid body and predicting its motion through rigid body motion. 
 
-\subsection{An iterator that converges to the exact solution of the implicit system}
-Many of these explicit predictions behave quite satisfactorily and in conjunction with (\ref{eqn:fixedpoint2}) provide both stability and accurate solutions to (\ref{eqn:Sys2again}). In many applications this is sufficient. In fact if we perform iterations of (\ref{eqn:AnewtonProj}) after using the initial guess (\ref{eqn:InitialGuess}) we obtain an approximate solution to (\ref{eqn:Sys2again}) with error on the order of the accuracy of our discretization.
+\subsection{Reintroducing translation and rotation iteratively}
+Many of the explicit predictors, such as those discussed above,  behave quite satisfactorily and in conjunction with  (\ref{eqn:fixedpoint2}) provide accurate and stable solutions to (\ref{eq:Xnl}). 
+ In a number of applications this is sufficient. If we employ (\ref{eqn:AnewtonProj}) after using the initial guess (\ref{eqn:InitialGuess}) we can obtain efficiently an approximate  solution to (\ref{eq:Xnl}) within truncation error with just a few iterations.
 
-In our particular simulation, however, extra care must be taken. The close proximity of the valve to its hinges can quickly lead to collisions 
-if small errors in translation propagate throughout the simulation. 
-This proximity can also seriously affect the behavior of an explicit prediction, leading to wild translation and rotation. We thus seek a means to reintroduce the three degrees of freedom we have neglected in applying (\ref{eqn:fixedpoint2}).
+In the current application, however, extra care must be taken. The close proximity of the valve to its hinges can quickly lead to unphysical collisions  if small errors in translation propagate throughout the simulation. 
+This proximity can also seriously affect the behavior of an explicit predictor, leading to highly inaccurate translation and rotation.
+Of course, even exact solutions to (\ref{eq:Xnl}) with $\Delta t$ large may still produce collisions due to inaccuracies and hence
+this problem is not intrinsic to the proposed methodology. 
 
-Suppose that we have a solution $\mathbf{X}^{n+1}$ to our system (\ref{eqn:Sys2again}). We must have then
+We seek a means to reintroduce more accurately the three degrees of freedom we have removed in applying~(\ref{eqn:fixedpoint2}).
+Suppose that we have a solution $\mathbf{X}^{n+1}$ to the original nonlinear system (\ref{eq:Xnl}). We must have then
 \begin{equation}
-\langle \mathbf{F}^{n+1}, \mathbf{e}_j(\mathbf{X}^{n+1}) \rangle = 0
+( \mathbf{F}^{n+1}, \mathbf{V}^j(\mathbf{X}^{n+1}) )_B = 0
 \textrm{ for } j=1,2,3.
 \label{eqn:FCondition2}
 \end{equation}
@@ -1241,56 +1309,62 @@ where $\mathbf{F}^{n+1}$ is such that
 \begin{equation}
 \mathcal{M}_n\mathbf{F}^{n+1}=\mathbf{X}^{n+1}-\mathbf{b}^n.
 \end{equation}
-This is because if $\mathbf{X}^{n+1}$ solves (\ref{eqn:Sys2again}) then $\mathbf{F}^{n+1} = \mathcal{A}_{h_B}\mathbf{X}^{n+1}$ and $\mathcal{A}_{h_B}$ can't generate forces with nonzero components along $\mathbf{e}_i$, $i=1,2,3$.
-(\ref{eqn:FCondition2}) suggests that before every iteration of (\ref{eqn:fixedpoint2}) we simply shift and rotate $\mathbf{X}^{n+1,k}$ such that 
-$\langle \mathbf{F}^{k+1}, \mathbf{e}_j(\mathbf{X}^{n+1,k}) \rangle = 0$ for $j=1,2,3$, where $\mathcal{M}_n\mathbf{F}^{k+1}=\mathbf{X}^{n+1,k}-\mathbf{b}^n$ as before. This can be approximately accomplished by finding $(a_1,a_2)$ and $\theta$, a translation vector and an angle, such that
+This is because if $\mathbf{X}^{n+1}$ solves (\ref{eq:Xnl}) then $\mathbf{F}^{n+1} = \mathcal{A}_{h_B}\mathbf{X}^{n+1}$ and $\mathcal{A}_{h_B}$ cannot generate forces with nonzero components along $\mathbf{V}_j$, $j=1,2,3$.
+Condition (\ref{eqn:FCondition2}) suggests that before each iteration of (\ref{eqn:fixedpoint2}) we simply shift and rotate $\mathbf{X}^{n+1,k}$ such that 
+$( \mathbf{F}^{k+1}, \mathbf{V}_j(\mathbf{X}^{n+1,k}) )_B = 0$ for $j=1,2,3$, where $\mathcal{M}_n\mathbf{F}^{k+1}=\mathbf{X}^{n+1,k}-\mathbf{b}^n$ as before. This can be approximately accomplished by finding $(a_1,a_2)$ and $\theta$, a translation vector and an angle, such that for $j=1,2,3$
 \begin{equation}
-\langle \mathcal{M}_n^{-1}(\mathbf{X}^{n+1,k}+a_1\mathbf{e}_1+a_2\mathbf{e}_2+\theta\mathbf{e}_3(\mathbf{X}^{n+1,k})-\mathbf{b}^n),  \mathbf{e}_j(\mathbf{X}^{n+1,k}) \rangle = 0 \textrm{ for } j=1,2,3.
+( \mathcal{M}_n^{-1}(\mathbf{X}^{n+1,k}+a_1\mathbf{V}^1+a_2\mathbf{V}^2+\theta\mathbf{V}^3(\mathbf{X}^{n+1,k})-\mathbf{b}^n),  \mathbf{V}^j(\mathbf{X}^{n+1,k}) )_B = 0.
 \label{eqn:ProjFree}
 \end{equation}
 Or, equivalently,
 \begin{equation}
-\left( \begin{array}{ccc}
-\langle\mathbf{F}_{\mathbf{e}_1},\mathbf{e}_1\rangle &
-\langle\mathbf{F}_{\mathbf{e}_2},\mathbf{e}_1\rangle &
-\langle\mathbf{F}_{\mathbf{e}_3},\mathbf{e}_1\rangle \\
-\langle\mathbf{F}_{\mathbf{e}_1},\mathbf{e}_2\rangle &
-\langle\mathbf{F}_{\mathbf{e}_2},\mathbf{e}_2\rangle &
-\langle\mathbf{F}_{\mathbf{e}_3},\mathbf{e}_2\rangle \\
-\langle\mathbf{F}_{\mathbf{e}_1},\mathbf{e}_3\rangle &
-\langle\mathbf{F}_{\mathbf{e}_2},\mathbf{e}_3\rangle &
-\langle\mathbf{F}_{\mathbf{e}_3},\mathbf{e}_3\rangle \\
-\end{array} \right)
-\left( \begin{array}{c}
+\begin{split}
+\left[ \begin{array}{ccc}
+(\mathbf{W}^1,\mathbf{V}^1)_B &
+(\mathbf{W}^2,\mathbf{V}^1)_B &
+(\mathbf{W}^3,\mathbf{V}^1)_B \\
+(\mathbf{W}^1,\mathbf{V}^2)_B &
+(\mathbf{W}^2,\mathbf{V}^2)_B &
+(\mathbf{W}^3,\mathbf{V}^2)_B \\
+(\mathbf{W}^1,\mathbf{V}^3)_B &
+(\mathbf{W}^2,\mathbf{V}^3)_B &
+(\mathbf{W}^3,\mathbf{V}^3)_B \\ 
+\end{array} \right] &
+\left[ \begin{array}{c}
 a_1 \\ a_2 \\ \theta
-\end{array} \right)
-=
--\left( \begin{array}{c}
-\langle\mathbf{F}^{k+1},\mathbf{e}_1\rangle \\
-\langle\mathbf{F}^{k+1},\mathbf{e}_2\rangle \\
-\langle\mathbf{F}^{k+1},\mathbf{e}_3\rangle \\
-\end{array} \right),
+\end{array} \right]
+= \\
+&-\left[ \begin{array}{c}
+(\mathbf{F}^{k+1},\mathbf{V}^1)_B \\
+(\mathbf{F}^{k+1},\mathbf{V}^2)_B \\
+(\mathbf{F}^{k+1},\mathbf{V}^3)_B \\
+\end{array} \right],
+\end{split}
 \end{equation}
-where $\mathcal{M}_n\mathbf{F}_{\mathbf{e}_j} = \mathbf{e}_j$ for $j=1,2,3$.
-We then construct an updated configuration 
+where $\mathcal{M}_n\mathbf{W}^j = \mathbf{V}^j$ for $j=1,2,3$.
+Then, we construct an updated configuration 
 \begin{equation}
-\mathbf{X}^{n+1,k} \leftarrow R_{\theta}\mathbf{X}^{n+1,k}+a_1\mathbf{e}_1+a_2\mathbf{e}_2
+\mathbf{X}^{n+1,k} \leftarrow R_{\theta}\mathbf{X}^{n+1,k}+a_1\mathbf{V}^1+a_2\mathbf{V}^2
 \label{eqn:Rotate}
 \end{equation}
 after which we proceed to calculate $\mathbf{X}^{n+1,k+1}$ via (\ref{eqn:AnewtonProj}) using an unmodified $\mathbf{F}^{k+1}$.
-In this manner we obtain an iteration which converges rapidly to a solution of (\ref{eqn:Sys2again}).
-This iteration converges nearly as quickly as (\ref{eqn:fixedpoint2}) does for a fixed valve with no rotation or translation. There is an additional cost per iteration though. The predominant costs come from solving linear systems involving $\mathcal{M}_n$, which we must now do four times, calculating $\mathbf{F}^{k+1}$ as well as $\mathbf{F}_{\mathbf{e}_j}$ for $j=1,2,3$.
+In this manner we obtain an iteration which converges rapidly to a solution of (\ref{eq:Xnl}).
+This iteration converges nearly as quickly as (\ref{eqn:fixedpoint2}) does for a fixed valve with no rotation or translation. There is an additional cost per iteration though. The predominant cost comes from solving the linear systems involving $\mathcal{M}_n$, which we must now do four times to calculate $\mathbf{W}^j$ for $j=1,2,3$ as well as $\mathbf{F}^{k+1}$.
 
-Luckily these costs aren't great in practice. Obviously $\mathbf{F}_{\mathbf{e}_1}$ and $\mathbf{F}_{\mathbf{e}_2}$ only need to be calculated once per timestep. For our purposes though we can get away with calculating $\mathbf{F}_{\mathbf{e}_3}$ just once per timestep as well, even though $\mathbf{e}_3$ depends on the current guess $\mathbf{X}^{n+1,k}$ which changes throughout the calculation of a single timestep. Doing so does not degrade the final residual beyond the limits of accuracy provided by our multigrid solver.
-Additionally  $\mathbf{F}_{\mathbf{e}_j}$ for $j=1,2,3$ will not change greatly from timestep to timestep, precipitating their use as good initial guesses in the following timesteps. Together we will see that the actual costs of our iterators are not the predominant cost of each timestep but are rather dominated by the cost of initializing the linear system and multigrid itself.
+Fortunately, these added costs are not significant in practice. The vectors $\mathbf{W}^1$ and $\mathbf{W}^2$ only need to be calculated once per timestep. For our simulations, we calculate $\mathbf{W}^3$ only once per timestep as well, even though $\mathbf{V}^3$ depends on the current guess $\mathbf{X}^{n+1,k}$. We find that this does not degrade the final residual beyond the limits of accuracy provided by our multigrid solver. Moreover,  $\mathbf{W}^j$ for $j=1,2,3$ will change only incrementally from one time-step to the next and hence these same vectors can be reused  as good initial guesses in the following several time-steps. 
+At the end, the predominant cost of  the proposed iterators is that of initializing the linear system and multigrid itself.
 
-There is an additional subtlety that we wish to point out. The prolongation and restriction operators we use in our multigrid for solving $\mathcal{M}_n^{-1}$ are geometrically inspired, relying on the underlying structure of our configuration. However this fails to give adequate weight to the fluid interactions \textit{between} surfaces, in particular the interaction between the ends of the valve and the cushions as well as the interaction between the middle of the valve and the hinges.
+\subsection{Near boundary-boundary interactions}
+There is an additional subtlety that we wish to point out. The prolongation and restriction operators we use in our multigrid for solving 
+$\mathcal{M}_n\mathbf{W}^j = \mathbf{V}^j$  are geometrically inspired, relying on the underlying structure of the immersed boundary configuration. However, this approach fails to give adequate weight to the fluid interactions \textit{between} immersed boundaries, in particular the interaction between the ends of the valve and the cushions as well as the interaction between the middle of the valve and the hinges.
 
-In our case the multigrid still converges but not sufficiently quickly at key points. In particular with only a few iterations our multigrid may fail to capture all the necessary dynamics between the valve and hinges to prevent collision and protrusion. Certainly a more robust algebraic multigrid algorithm for selecting prolongation and restriction operators may solve this. Keeping with the mentality of a geometric multigrid however we simply employ a quick yet effective alteration to our smoother.
+The linear multigrid we employ still converges in the current situation but not sufficiently fast at key points.  
+To capture accurately all the required dynamics between the valve and hinges to prevent collision and protrusion
+it is necessary to increase significantly the number of multigrid cycles. While a robust algebraic multigrid algorithm with more
+appropriate  prolongation and restriction operators might remedy this problem we opt here for a simple yet effective local alteration to our smoother.
 
-We maintain our standard Gauss-Seidel iteration, however, in addition we also perform a direct solve via Gaussian elimination of a subset of our problem. Because we are only concerned with the high accuracy needed to prevent collision between the valve and hinge we isolate those points close to the hinge. See figure \ref{fig:Box}. Holding all other points outside this region fixed we then proceed to solve the resulting reduced system. Afterward we perform the standard Gauss-Seidel iteration to smooth the interface between the points inside and outside the solved region. Because the number of points we are solving for is relatively small this procedure is quite cheap and doesn't contribute greatly to the cost of the multigrid iteration.
- 
-As an aside, note that even with exact solutions to (\ref{eqn:Sys2again}) taking $\Delta t$ large may still produce collisions due to inaccuracies in the discretization itself, rather than any shortcomings in our methods to solve the implicit systems. Nonetheless in such cases the exact solution to the implicit system (\ref{eqn:Sys2again}) will still behave much more satisfactorily than with explicit updates for the valve location and angle.
+We maintain the standard Gauss-Seidel relaxation but in addition we also perform a direct solve, via Gaussian elimination,  of a small subset of the problem. Because we are only concerned with the high accuracy needed to prevent collision between the valve and hinge we isolate those points close to the hinge (see Fig.~\ref{fig:Box}). Holding all other points outside this region fixed we then proceed to solve the resulting reduced system. Afterward we perform the standard Gauss-Seidel sweep to smooth the interface between the points inside and outside the solved region. Because of the small size of the selected local region, 
+ this procedure is quite inexpensive and does not contribute in a significant manner to the cost of the multigrid iteration.
 
 \begin{figure}[!b]
   \begin{center}
@@ -1302,119 +1376,78 @@ As an aside, note that even with exact solutions to (\ref{eqn:Sys2again}) taking
 \end{figure}
 
 
-\section{Results for the application to the heart valve}
-For our heart valve simulation the initial condition is the rest configuration of all links and tethers, with the valve resting between the two hinges and points straight up. The current force is $v_{flow}=100$ and all spring constants are taken to be $10^9l^{-2}$, where $l=h/2$ is the length between nodes in our valve. We have much slower velocities here than in the ellipse relaxation, with speeds reaching roughly $10$ units. Taking a characteristic length to be the length of the heart valve we obtain a Reynold's number of roughly $5$. The slower speeds lead to a CFL restraint orders of magnitude larger and this allows our implicit scheme to show its power, even though now $N_b \approx 4N$, leading to an implicit timestep costing roughly $20$ times that of an explicit one.
+\subsection{Numerical results}
+The initial condition is a rest configuration of all links and tethers. The valve rests between the two hinges and is parallel to the $y$-axis. The imposed flow is $v_{flow}=100$ and all spring constants are taken to be $k=10^9l^{-2}$, where $l=h/2$ is the length between nodes in our valve. The magnitude of the velocities here reaches approximately 10 units,  much smaller than that in the elliptical membrane case. Taking a characteristic length to be the length of the heart valve we obtain a Reynolds number of about $5$. The smaller speeds lead to a mild CFL constraint and this allows our  semi-implicit approach to show its power, even though now $N_B \approx 4N$ and the cost of an implicit time-step is roughly $20$ times that of an explicit one.
 
-For the FE/BE simulation $\Delta t$ is again taken to be the maximum allowable, with $\Delta t = 30h\sigma^{-2}$. For our implicit scheme we fix $\Delta t=.0025$, well below the CFL restraint. The results for the explicit simulations are given in table \ref{table:ValveFEBESims} with the results from the implicit simulations following in table \ref{table:ValveImplicitSims}.
+For the FE/BE simulation $\Delta t$ is again taken to be the maximum allowable while retaining stability, with $\Delta t = 30h k^{-1/2}$. For the proposed semi-implicit approach we fix $\Delta t=0.0025$, well below the CFL restraint. 
+With the
+constant imposed flow, the valve will simply open. The CPU times for the explicit simulations are given in Table~\ref{table:ValveFEBESims} with the results from the implicit simulations following in 
+Table~\ref{table:ValveImplicitSims}. With a less restrictive CFL constraint the semi-implicit approach becomes $O(1000)$
+faster than FE/BE. Stability-wise,  $\Delta t$ may be taken even larger for the semi-implicit method,  up to the limit of the CFL restraint, leading to even greater savings in CPU time. However, this will typically increase leakage through the immersed boundary and eventually allow the valve to collide and pass through the hinges.
 
-Here the implicit scheme fairs much better than in the linear case, being free of a restrictive CFL condition. The total CPU time is on the order of $1000$ times less. $\Delta t$ may be taken even larger, up to the CFL restraint, leading to even greater savings in CPU time, but this will typically increase leakage through the immersed boundary and eventually allow the valve to collide and pass through the hinges.
-
-\subsection{Time dependent $v_{flow}$}
-The purpose of $v_{flow}$ is to impart a force on the fluid which leads to the valve opening and closing. If $v_{flow}$ is held constant we can only open the valve. To then close the valve we must introduce a time dependent $v_{flow}$.
+To open and close the valve we consider a time dependent imposed flow $v_{flow}(t)$.
 We define
 \begin{equation}
 v_{flow}(t) =
 \left\{
 \begin{array}{cccc}
-&60000t(.1-t)& &t<.1 \\
-&-60000(t-.1)(.2-t)& &t\geq .1
+&60000t(0.1-t)& &t<0.1 \\
+&-60000(t-0.1)(0.2-t)& &t\geq 0.1
 \end{array}
 \right. .
 \label{eqn:VariableFlow}
 \end{equation}
-Solving the resulting numerical problem is typically more difficult with explicit methods; however, for our implicit methods no changes to the code are required except to directly account for the changing values of $v_{flow}$. We demonstrate the time evolution of the system in figure \ref{fig:TimeProgression}.
+A sequence of snap-shots of the motion of the valve as it opens and closes is depicted in Fig.~\ref{fig:TimeProgression}
+where also flooded contours of the vorticity are shown. Initially, there is a noticeable generation of (positive) vorticity at the upper and lower tips of the valve as the valve opens as well as in the upper cushion. As the valve reverses its motion the vorticity in those same
+areas evolves toward positive values and becomes large and localized as the valve closes. 
+ 
+
 
 \begin{table}
-\caption{Ellipse relaxation with Forward Euler/Backward Euler scheme for convective flows. The total CPU time up to time $T$ is given, with the average CPU time per timestep given.}
-\label{table:EllipseFEBESims}
+\caption{The number of Lagrangian nodes $N_B$ and the maximum stable timestep $\Delta t$ for a FE/BE method are given for increasing values of $N$.}
+\label{table:ValveSimData}
 \begin{center}
-\begin{tabular}{|c||c c|c|c c c c c|}
+\begin{tabular}{|c|c c|}
 \hline
-$N$ & $N_b$ & $\Delta t$ & Average & $T=.0001$ & $T=.0002$ & $T=.0005$ &$T=.001$ &$T=.005$\\
+$N$ & $N_B$ & $\Delta t$ \\
 \hline
-128 & 256 & $1.95\cdot 10^{-6}$ & .0286 & 1.047 & 2.030 & 5.233 & 11.789 & 73.352 \\
-256 & 512 & $9.76\cdot 10^{-7}$ & .143 & 14.577 & 29.076 & 72.908 & 146.079 & 730.210\\
-384 & 768 & $6.51\cdot 10^{-7}$ &.340 & 52.251 & 104.701 & 261.465 & 522.469 & 2613.190\\
-512 & 1024 & $4.87\cdot 10^{-7}$ &.634 & 128.374 & 256.994 & 643.436 & 1288.150 & 6491.947\\
+128 & 520 & $1.15\cdot 10^{-7}$ \\
+256 & 1053 & $2.89\cdot 10^{-8}$ \\
+384 & 1592 & $1.29\cdot 10^{-8}$ \\
+512 & 2122 & $7.24\cdot 10^{-9}$ \\
 \hline
 \end{tabular}
 \end{center}
 
-\caption{Ellipse relaxation with implicit scheme solved via linear multigrid for convective flows. The total CPU time up to time $T$ is given, with the average CPU time per timestep given.}
-\label{table:EllipseImplicitSims}
-\begin{center}
-\begin{tabular}{|c||c c|c|c c c c c|}
-\hline
-$N$ & $N_b$ & $\Delta t$ & Average & $T=.0001$ & $T=.0002$ & $T=.0005$ &$T=.001$ &$T=.005$\\
-\hline
-128 & 256 & $1.17\cdot 10^{-4}$ & .101 & .125 & .250 & .609 & 1.015 & 4.341 \\
-256 & 512 & $7.81\cdot 10^{-5}$ & .548 & 1.25 & 1.844 & 4.360 & 7.796 & 35.061\\
-384 & 768 & $5.21\cdot 10^{-5}$ & 1.239 & 2.797 & 5.484 & 13.579 & 26.034 & 118.984\\
-512 & 1024 & $3.91\cdot 10^{-5}$ & 2.337 & 7.640 & 15.094 & 32.813 & 62.845 & 299.095\\
-\hline
-\end{tabular}
-\end{center}
-
-\caption{Ellipse relaxation with Forward Euler/Backward Euler scheme for Stokes flow. The total CPU time up to time $T$ is given, with the average CPU time per timestep given.}
-\label{table:EllipseFEBESimsStokes}
-\begin{center}
-\begin{tabular}{|c||c c|c|c c c c c|}
-\hline
-$N$ & $N_b$ & $\Delta t$ & Average & $T=.001$ & $T=.002$ & $T=.005$ &$T=.01$ &$T=.05$\\
-\hline
-128 & 256 & $1.95\cdot 10^{-6}$ & .0267 & 12.544 & 27.484 & 74.820 & 130.583 & 683.955 \\
-256 & 512 & $9.76\cdot 10^{-7}$ & .1447 & 147.186 & 294.760 & 736.971 & 1473.703 & 7410.498\\
-384 & 768 & $6.51\cdot 10^{-7}$ & .3458 & 530.083 & 1060.674 & 2656.393 & 5311.060 & $26555.300^*$\\
-512 & 1024 & $4.87\cdot 10^{-7}$ & .7078 & 1465.628 & 2899.736 & 7266.940 & $14533.881^*$ & $72669.405^*$\\
-\hline
-\end{tabular}
-\end{center}
-
-\caption{Ellipse relaxation with implicit scheme solved via linear multigrid for Stokes flow. The total CPU time up to time $T$ is given, with the average CPU time per timestep given.}
-\label{table:EllipseImplicitSimsStokes}
-\begin{center}
-\begin{tabular}{|c||c c|c|c c c c c|}
-\hline
-$N$ & $N_b$ & $\Delta t$ & Average & $T=.001$ & $T=.002$ & $T=.005$ &$T=.01$ &$T=.05$\\
-\hline
-128 & 256 & $.001$ & 0.093 & 0.312 & 0.515 & 1.046 & 1.936 & 9.342\\
-256 & 512 & $.001$ & 0.531 & 1.328 & 2.437 & 5.624 & 10.906 & 53.078\\
-384 & 768 & $.001$ & 1.239 & 3.078 & 5.562 & 12.953 & 25.281 & 123.859\\
-512 & 1024 & $.001$ & 2.320 & 5.312 & 9.937 & 23.812 & 46.921 & 232.046\\
-\hline
-\end{tabular}
-\end{center}
-
-\caption{Heart valve simulation with Forward Euler/Backward Euler scheme. The total CPU time up to time $T$ is given, with the average CPU time per timestep given. $^*$ denotes an extrapolated value.}
+\caption{Heart valve simulation with Forward Euler/Backward Euler scheme. The total CPU time taken to run the simulation up to time $T$ is given, with the average CPU time per timestep given. $^*$ denotes an extrapolated value.}
 \label{table:ValveFEBESims}
 \begin{center}
-\begin{tabular}{|c||c c|c|c c c c c|}
+\begin{tabular}{|c|c c c c c|}
 \hline
-$N$ & $N_b$ & $\Delta t$ & Average & $T=.01$ & $T=.02$ & $T=.05$ &$T=.1$ &$T=.5$\\
+$N$ & Average & $T=0.01$ & $T=0.05$ &$T=0.1$ &$T=0.5$\\
 \hline
-128 & 520 & $1.15\cdot 10^{-7}$ & .02434 & 2110.491 & 4212.461 & 10508.954 & $21017.909^*$ & $105089.546^*$ \\
-256 & 1053 & $2.89\cdot 10^{-8}$ & .1091 & $37687.166^*$ & $75374.332^*$ & $188435.832^*$ & $376871.664^*$ & $1884358.323^*$ \\
-384 & 1592 & $1.29\cdot 10^{-8}$ & .249 & $193168.570^*$ & $386337.141^*$ & $965842.853^*$ & $1931685.707^*$ & $9658428.538^*$ \\
-512 & 2122 & $7.24\cdot 10^{-9}$ & .503 & $694291.698^*$ & $1388583.397^*$ & $3471458.493^*$ & $6942916.986^*$ & $34714584.933^*$\\
+128 & 0.024 & 2110.49 & 10508.95 & $21017.90^*$ & $105089.54^*$ \\
+256 & 0.109 & $37687.16^*$ & $188435.83^*$ & $376871.66^*$ & $1884358.32^*$ \\
+384 & 0.249 & $193168.57^*$ & $965842.85^*$ & $1931685.70^*$ & $9658428.53^*$ \\
+512 &0.503 & $694291.69^*$ & $3471458.49^*$ & $6942916.98^*$ & $34714584.93^*$\\
 \hline
 \end{tabular}
 \end{center}
 
-\caption{Heart valve simulation with implicit scheme. The total CPU time up to time $T$ is given, with the average CPU time per timestep given.}
+\caption{Heart valve simulation with implicit scheme. The total CPU time taken to run the simulation up to time $T$ is given, with the average CPU time per timestep given. $\Delta t = 0.0025$.}
 \label{table:ValveImplicitSims}
 \begin{center}
-\begin{tabular}{|c||c c|c|c c c c c|}
+\begin{tabular}{|c|c c c c c|}
 \hline
-$N$ & $N_b$ & $\Delta t$ & Average & $T=.01$ & $T=.02$ & $T=.05$ &$T=.1$ &$T=.5$\\
+$N$ & Average & $T=0.01$ & $T=0.05$ &$T=0.1$ &$T=0.5$\\
 \hline
-128 & 520 & $.0025$ & .588 & 2.001 & 4.031 & 10.436 & 21.155 & 117.767\\
-256 & 1053 & $.0025$ & 2.014 & 7.640  & 15.280 & 38.171 & 76.297 & 402.749\\
-384 & 1592 & $.0025$ & 4.747 & 18.735 & 37.532 & 93.266 & 186.270 & 949.409\\
-512 & 2122 & $.0025$ & 9.538 & 34.984 & 69.983 & 174.702 & 348.531 & 1907.635\\
+128 & 0.588 & 2.001 & 10.436 & 21.155 & 117.767\\
+256 & 2.014 & 7.640  & 38.171 & 76.297 & 402.749\\
+384 & 4.747 & 18.735 & 93.266 & 186.270 & 949.409\\
+512 & 9.538 & 34.984 & 174.702 & 348.531 & 1907.635\\
 \hline
 \end{tabular}
 \end{center}
-
 \end{table}
 
 \begin{figure}[p]
@@ -1429,7 +1462,7 @@ $N$ & $N_b$ & $\Delta t$ & Average & $T=.01$ & $T=.02$ & $T=.05$ &$T=.1$ &$T=.5$
 \hfill
 \includegraphics[bb=1.3in .5in 13.5in 6.5in,width=4.2in,clip]{fig_c80_n512.pdf}
 \end{center}
-\caption{\small Vorticity field of our valve system through time. $N=512,N_b=2082,\Delta t=.0025,\sigma=2.62\cdot 10^{14}$. Frames shown at total simulation time $T=.0625,.1125,.175,.2$}
+\caption{\small Vorticity field of our valve system through time. $N=512,N_B=2082,\Delta t=0.0025$. Frames shown at total simulation time $T=0.0625,0.1125,0.1750,0.2000$}
 \label{fig:TimeProgression}
 \end{figure}
 
@@ -1439,11 +1472,14 @@ $N$ & $N_b$ & $\Delta t$ & Average & $T=.01$ & $T=.02$ & $T=.05$ &$T=.1$ &$T=.5$
 
 
 \section{Conclusion}
-Implicit methods for alleviating the stiffness of the IB method have been around for some time. Their implementation involves solving systems of equations typically thought to be prohibitively expensive. Our intent with this paper was not to detail a single silver bullet to solve the IB problem but rather to illuminate paths to solving these systems. We have provided avenues to this end for two particular applications of the IB method but there will likely remain challenges when applying the techniques detailed here to the incredibly varied body of applications for which the IB method is implemented.
+\label{Sec:Conclusions}
+Implicit methods for alleviating the stiffness of the IB Method have been around for some time. Their implementation involves solving systems of equations typically thought to be prohibitively expensive. One of the main objectives of this work is to illuminate paths to solving the systems arising from certain robust semi-implicit discretizations of the IB Method. We have provided avenues to this end for three particular applications but there will likely remain challenges when extending the techniques detailed here to the incredibly varied body of applications for which the IB Method can be employed.
 
-A key benefit of our methods is that they have no dependence on the specifics of the fluid solver $\mathcal{L}_h$. If we use an adaptive mesh to achieve fluid solves in $\mathcal{O}(N_b)$ time then this will carry over to our implicit solvers, allowing us to take arbitrary time steps with the minimal order cost possible. This is a particularly exciting prospect for 3D cases and we hope this paper will stimulate further investigations.
+A key benefit of the proposed methods is that they have no dependence on the specifics of the fluid solver $\mathcal{L}_h$. If we use an adaptive mesh to achieve fluid solves in $O(N_B)$ time then this will carry over to our implicit solvers, allowing us to take large time steps with the minimal order cost possible. This is a particularly exciting prospect for extending the methodology to 3D which is a current aim of our own ongoing research. 
 
-
+\section*{Acknowledgments}
+The authors would like to thank Charles Peskin, David McQueen, Thomas Hou, and Zuoqiang Shi for insightful discussions. 
+Partial support for this work was provided by the National Science Foundation under Grant number  DMS 0609996 (HDC and JEF) and by FAPESP Grant number 00/02801-0 (AMR).
 
 \bibliographystyle{elsarticle-num}
 \bibliography{interface}
