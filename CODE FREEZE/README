@@ -1,0 +1,9 @@
+This is the code used to generate the results for the paper "Effcient solutions to robust, semi-implicit discretizations of the Immersed Boundary Method".
+
+This code is disorganized and it will never get better. It has been purposefully frozen at the time of the writing of this paper.
+
+Don't read it, don't look at it, and especially don't use it unless absolutely necessary.
+
+A cleaned-up version of this code, intended for reading, looking, and using, can be found on GitHub at https://github.com/JordanFisher/Implicit-Immersed-Boundary.
+
+In the event of apocalypse and GitHub ceased to exist but somehow you still found this repo, please contact the author at jordan.efisher@gmail.com.
